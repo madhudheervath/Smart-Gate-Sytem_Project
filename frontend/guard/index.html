@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate Scanner Portal - GatePass</title>
+    <link rel="stylesheet" href="style.css?v=2025-aligned">
+    <link rel="stylesheet" href="face-verify-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="container">
+            <div class="card">
+                <h1>🔍 Gate Scanner</h1>
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" value="scanner@uni.edu" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" value="scanner123" required>
+                    </div>
+                    <div id="loginError" class="error"></div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Page -->
+    <div id="scannerPage" class="page">
+        <div class="navbar">
+            <div class="nav-content">
+                <h1>🔍 Gate Scanner</h1>
+                <div class="nav-right">
+                    <span id="userName" class="user-name"></span>
+                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Top Section: Scanner (Left) + Statistics (Right) -->
+            <div class="top-layout">
+                <!-- Left: Scanner Card -->
+                <div class="card scanner-card">
+                    <h2>QR Code Scanner</h2>
+                    
+                    <div class="scanner-modes">
+                        <button class="mode-btn active" onclick="switchMode('camera')" id="cameraBtn">
+                            📷 Camera
+                        </button>
+                        <button class="mode-btn" onclick="switchMode('manual')" id="manualBtn">
+                            ⌨️ Manual Entry
+                        </button>
+                    </div>
+
+                    <!-- Camera Scanner -->
+                    <div id="cameraMode" class="scanner-mode active">
+                        <div class="single-camera-container">
+                            <div class="video-container">
+                                <div class="video-label" id="cameraLabel">📷 Scan QR Code</div>
+                                <video id="video" autoplay></video>
+                                <canvas id="canvas" style="display:none;"></canvas>
+                                <div id="scanStatus" class="scan-status">Ready to scan</div>
+                            </div>
+                        </div>
+                        <div class="camera-controls">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="faceVerifyToggle" checked>
+                                <span>Enable Face Verification (After QR)</span>
+                            </label>
+                        </div>
+                        <button class="btn btn-primary" onclick="startCamera()" id="startBtn">
+                            Start Camera
+                        </button>
+                        <button class="btn btn-danger" onclick="stopCamera()" id="stopBtn" style="display:none;">
+                            Stop Camera
+                        </button>
+                    </div>
+
+                    <!-- Manual Entry -->
+                    <div id="manualMode" class="scanner-mode">
+                        <div class="form-group">
+                            <label for="manualToken">QR Token</label>
+                            <textarea id="manualToken" rows="4" placeholder="Paste QR token here..."></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="verifyManual()">
+                            Verify Token
+                        </button>
+                    </div>
+
+                    <!-- Result Display -->
+                    <div id="resultDisplay" class="result-display"></div>
+                </div>
+
+                <!-- Right: Statistics Section -->
+                <div class="card stats-card">
+                    <h2>📊 Statistics</h2>
+                    <div class="stats-grid-vertical">
+                        <div class="stat-card-compact">
+                            <div class="stat-number" id="totalTodayCount">0</div>
+                            <div class="stat-label">Total Scans Today</div>
+                        </div>
+                        <div class="stat-card-compact stat-entry">
+                            <div class="stat-number" id="entryTodayCount">0</div>
+                            <div class="stat-label">Entry Today</div>
+                        </div>
+                        <div class="stat-card-compact stat-exit">
+                            <div class="stat-number" id="exitTodayCount">0</div>
+                            <div class="stat-label">Exit Today</div>
+                        </div>
+                        <div class="stat-card-compact">
+                            <div class="stat-number" id="successTodayCount">0</div>
+                            <div class="stat-label">Successful Today</div>
+                        </div>
+                        <div class="stat-card-compact">
+                            <div class="stat-number" id="failedTodayCount">0</div>
+                            <div class="stat-label">Failed Today</div>
+                        </div>
+                        <div class="stat-card-compact">
+                            <div class="stat-number" id="totalAllTimeCount">0</div>
+                            <div class="stat-label">Total All Time</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Recent Scans (Full Width) -->
+            <div class="card recent-scans-full">
+                <div class="scans-header">
+                    <h2>Recent Scans</h2>
+                    <button onclick="loadRecentScans()" class="btn btn-secondary btn-small">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="recentScans" class="scans-container-horizontal"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="face-verify-sequential.js"></script>
+    <script src="app.js?v=2025-entry-exit"></script>
+</body>
+</html>
+

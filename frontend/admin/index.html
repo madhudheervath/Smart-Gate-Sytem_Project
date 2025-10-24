@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal - GatePass</title>
+    <link rel="stylesheet" href="style.css?v=2025">
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="container">
+            <div class="card">
+                <h1>🛡️ Admin Portal</h1>
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" value="admin@uni.edu" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" value="admin123" required>
+                    </div>
+                    <div id="loginError" class="error"></div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page">
+        <div class="navbar">
+            <div class="nav-content">
+                <h1>🛡️ Admin Dashboard</h1>
+                <div class="nav-right">
+                    <span id="userName" class="user-name"></span>
+                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Quick Actions -->
+            <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+                <a href="logs.html" class="btn btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                    📊 View Real-Time Logs & Analytics
+                </a>
+                <a href="location.html" class="btn btn-primary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    📍 Configure Campus Location
+                </a>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="pendingCount">0</div>
+                    <div class="stat-label">Pending Requests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="approvedCount">0</div>
+                    <div class="stat-label">Approved Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalApprovedCount">0</div>
+                    <div class="stat-label">Total Approved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="usedCount">0</div>
+                    <div class="stat-label">Used Passes</div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card">
+                <div class="filter-bar">
+                    <button class="filter-btn active" data-status="pending" onclick="filterPasses('pending')">
+                        ⏳ Pending
+                    </button>
+                    <button class="filter-btn" data-status="approved" onclick="filterPasses('approved')">
+                        ✅ Approved
+                    </button>
+                    <button class="filter-btn" data-status="rejected" onclick="filterPasses('rejected')">
+                        ❌ Rejected
+                    </button>
+                    <button class="filter-btn" data-status="used" onclick="filterPasses('used')">
+                        🚪 Used
+                    </button>
+                    <button class="filter-btn" data-status="" onclick="filterPasses('')">
+                        📋 All
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadPasses()" style="margin-left: auto;">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pass Requests -->
+            <div class="card">
+                <h2>Pass Requests</h2>
+                <div id="passesContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=2025"></script>
+</body>
+</html>
+

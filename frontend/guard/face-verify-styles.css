@@ -1,0 +1,191 @@
+/* Face Verification Styles for Guard Portal - Single Camera Mode */
+
+.single-camera-container {
+    max-width: 600px;
+    margin: 0 auto 20px;
+}
+
+.video-container {
+    position: relative;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.video-label {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(79, 172, 254, 0.9);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    z-index: 10;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.video-container video {
+    width: 100%;
+    display: block;
+    border-radius: 12px;
+}
+
+.scan-status {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 700;
+    z-index: 10;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.scan-status.qr-scanning {
+    background: rgba(33, 150, 243, 0.9);
+    color: white;
+}
+
+.scan-status.qr-detected {
+    background: rgba(76, 175, 80, 0.9);
+    color: white;
+    animation: pulse 0.5s;
+}
+
+.scan-status.face-prompt {
+    background: rgba(255, 193, 7, 0.9);
+    color: #000;
+    animation: pulse 1.5s infinite;
+    font-size: 16px;
+}
+
+.scan-status.face-capturing {
+    background: rgba(255, 152, 0, 0.9);
+    color: white;
+}
+
+.scan-status.verifying {
+    background: rgba(156, 39, 176, 0.9);
+    color: white;
+    animation: pulse 1s infinite;
+}
+
+.scan-status.success {
+    background: rgba(76, 175, 80, 0.9);
+    color: white;
+}
+
+.scan-status.failed {
+    background: rgba(244, 67, 54, 0.9);
+    color: white;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.05); }
+}
+
+.camera-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.checkbox-container:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.checkbox-container input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #4facfe;
+}
+
+.checkbox-container span {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Result Display Enhancement for Face Verification */
+.result-face-info {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid;
+}
+
+.result-face-info.verified {
+    border-left-color: #4caf50;
+}
+
+.result-face-info.not-verified {
+    border-left-color: #ff9800;
+}
+
+.result-face-info.failed {
+    border-left-color: #f44336;
+}
+
+.face-match-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+.face-match-badge.high {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.face-match-badge.medium {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ff9800;
+}
+
+.face-match-badge.low {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .camera-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .video-container {
+        min-height: 300px;
+    }
+}

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal - GatePass</title>
+    
+    <!-- Common Utilities -->
+    <link rel="stylesheet" href="../common/styles.css">
+    <link rel="stylesheet" href="style.css?v=improved-utilities-v6">
+    
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="../common/config.js"></script>
+    <script src="../common/utils.js"></script>
+    <script src="../common/api.js"></script>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="container">
+            <div class="card">
+                <h1>🎓 Student Portal</h1>
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" value="student1@uni.edu" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" value="s123456" required>
+                    </div>
+                    <div id="loginError" class="error"></div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page">
+        <div class="navbar">
+            <div class="nav-content">
+                <h1>🎓 Student Dashboard</h1>
+                <div class="nav-right">
+                    <span id="userName" class="user-name"></span>
+                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Student Info Card - Full Width -->
+            <div class="card full-width-card" id="studentInfo" style="display:none; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 5px solid #667eea; box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);">
+                <h3 style="margin-bottom:15px; color: #667eea; font-size: 22px; font-weight: 800;">👤 Student Information</h3>
+                <!-- Content will be filled by JavaScript -->
+            </div>
+
+            <!-- Dual Column Layout for Face Auth & Notifications -->
+            <div class="dashboard-grid">
+                <!-- Face Registration Card -->
+                <div class="card" id="faceRegCard" style="display:none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3 style="color: white; margin-bottom:20px; font-size: 20px; font-weight: 700;">🔐 Face Authentication</h3>
+                    <div id="faceStatus">
+                        <!-- Status will be filled by JavaScript -->
+                    </div>
+                    <div id="faceRegForm" style="margin-top:20px;">
+                        <p style="margin-bottom:15px; opacity:0.95; line-height: 1.6;">Upload a clear photo of your face for biometric verification at the gate.</p>
+                        <input type="file" id="faceImage" accept="image/*" style="display:none;" onchange="handleFaceImage(this)">
+                        <label for="faceImage" class="btn" style="background:white; color:#667eea; cursor:pointer; display:inline-block; font-weight: 700;">
+                            📷 Choose Photo
+                        </label>
+                        <div id="imagePreview" style="margin-top:15px; display:none;">
+                            <img id="previewImg" style="max-width:100%; border-radius:12px; border:3px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                            <button onclick="uploadFace()" class="btn" style="background:white; color:#667eea; margin-top:10px; width:100%; font-weight: 700;">
+                                ✅ Register Face
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Settings Card -->
+                <div class="card" id="notificationCard" style="display:none; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white;">
+                    <h3 style="color: white; margin-bottom:20px; font-size: 20px; font-weight: 700;">🔔 Push Notifications</h3>
+                    <div id="notificationStatus">
+                        <!-- Status will be filled by JavaScript -->
+                    </div>
+                    <div id="notificationActions" style="margin-top:20px;">
+                        <button onclick="enableStudentNotifications()" id="enableNotifBtn" class="btn" style="background:white; color:#28a745; font-weight:700; width:100%; margin-bottom:15px;">
+                            🔔 Enable Notifications
+                        </button>
+                        <div id="contactForm" style="display:none;">
+                            <div style="margin-bottom:15px;">
+                                <label style="display:block; margin-bottom:8px; font-weight:600;">Your Phone Number (Optional)</label>
+                                <input type="tel" id="studentPhone" placeholder="+919876543210" style="width:100%; padding:12px; border:none; border-radius:8px; font-size:16px;">
+                            </div>
+                            <div style="margin-bottom:15px;">
+                                <label style="display:block; margin-bottom:8px; font-weight:600;">Parent/Guardian Name</label>
+                                <input type="text" id="parentName" placeholder="Parent Name" style="width:100%; padding:12px; border:none; border-radius:8px; font-size:16px;">
+                            </div>
+                            <div style="margin-bottom:15px;">
+                                <label style="display:block; margin-bottom:8px; font-weight:600;">Parent Phone Number</label>
+                                <input type="tel" id="parentPhone" placeholder="+919876543210" style="width:100%; padding:12px; border:none; border-radius:8px; font-size:16px;">
+                            </div>
+                            <button onclick="saveContactInfo()" class="btn" style="background:white; color:#28a745; font-weight:700; width:100%;">
+                                💾 Save Contact Info
+                            </button>
+                        </div>
+                        <div id="parentPortalLink" style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.15); border-radius:12px; backdrop-filter:blur(10px); display:none;">
+                            <p style="font-size:14px; margin-bottom:10px; opacity:0.95;">📱 Share this link with your parent:</p>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <input type="text" id="parentLinkInput" readonly style="flex:1; padding:8px; border:none; border-radius:6px; font-size:12px; background:white; color:#333;">
+                                <button onclick="copyParentLink()" class="btn" style="background:white; color:#28a745; padding:8px 15px; font-size:12px;">
+                                    📋 Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Exit Button (Prominent) - Full Width -->
+            <div class="card full-width-card" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none; box-shadow: 0 12px 35px rgba(220,53,69,0.4); position: relative; overflow: hidden;">
+                <div style="position: absolute; top: 0; right: 0; width: 200px; height: 200px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;"></div>
+                <h2 style="color: white; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 28px; font-weight: 900; position: relative;">
+                    🚨 Emergency Exit
+                </h2>
+                <p style="opacity: 0.95; margin-bottom: 25px; font-size: 16px; line-height: 1.7; position: relative;">
+                    Need to leave campus urgently? Request an immediate emergency exit. This will notify all admins and grant you instant passage without approval delays.
+                </p>
+                <button onclick="requestEmergencyExit()" class="btn" style="background: white; color: #dc3545; font-weight: 800; width: 100%; padding: 18px; font-size: 17px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); position: relative; border-radius: 14px;">
+                    🚨 Request Emergency Exit Now
+                </button>
+                <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.15); border-radius: 14px; backdrop-filter: blur(10px); position: relative; border: 1px solid rgba(255,255,255,0.2);">
+                    <p style="font-size: 14px; margin: 0; opacity: 0.95; font-weight: 600;">⚠️ Use only for genuine emergencies</p>
+                    <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Instant approval - no waiting required</p>
+                    <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ All admins notified immediately</p>
+                    <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Complete audit trail maintained</p>
+                </div>
+            </div>
+
+            <!-- Quick Daily Entry Section with Side-by-Side Layout -->
+            <div class="daily-entry-section">
+                <!-- Left: Daily Entry Button -->
+                <div class="card daily-entry-card" style="box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);">
+                    <h2 style="color: white; font-size: 24px; font-weight: 800; margin-bottom: 15px;">🚪 Instant Gate Pass</h2>
+                    <p style="opacity: 0.95; margin-bottom: 25px; font-size: 15px; line-height: 1.7;">Generate your QR code instantly. No admin approval needed!</p>
+                    
+                    <!-- Pass Type Selector -->
+                    <div style="display: flex; gap: 12px; margin-bottom: 25px;">
+                        <button id="entryBtn" onclick="selectPassType('entry')" class="pass-type-btn" style="flex: 1; padding: 16px; border: 2px solid white; background: white; color: #667eea; border-radius: 12px; font-weight: 800; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(255,255,255,0.3);">
+                            🚪 Entry
+                        </button>
+                        <button id="exitBtn" onclick="selectPassType('exit')" class="pass-type-btn" style="flex: 1; padding: 16px; border: 2px solid rgba(255,255,255,0.5); background: transparent; color: white; border-radius: 12px; font-weight: 800; cursor: pointer; transition: all 0.3s;">
+                            🚶 Exit
+                        </button>
+                    </div>
+                    
+                    <button onclick="requestDailyEntry()" class="btn" style="background: white; color: #667eea; font-weight: 800; width: 100%; padding: 16px; font-size: 16px; box-shadow: 0 6px 20px rgba(255,255,255,0.4);">
+                        ⚡ Generate QR Now
+                    </button>
+                    <div style="margin-top: 25px; padding: 18px; background: rgba(255,255,255,0.15); border-radius: 12px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
+                        <p style="font-size: 14px; margin: 0; opacity: 0.95; font-weight: 600;">✓ Valid for 15 minutes</p>
+                        <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Select Entry or Exit type</p>
+                        <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Instant QR generation</p>
+                    </div>
+                </div>
+
+                <!-- Right: Current Pass QR Display -->
+                <div class="card qr-display-card" id="currentPassCard" style="display:none; box-shadow: 0 12px 40px rgba(102, 126, 234, 0.25);">
+                    <div style="text-align: center;">
+                        <h3 style="color: #667eea; margin-bottom: 20px; font-size: 24px; font-weight: 800;">✅ Your Active Pass</h3>
+                        <div class="pass-info-compact">
+                            <p style="margin: 8px 0; font-size: 15px; font-weight: 600;"><strong>Reason:</strong> <span id="passReason"></span></p>
+                            <p style="margin: 8px 0; font-size: 15px; font-weight: 600;"><strong>Expires:</strong> <span id="passExpiry"></span></p>
+                        </div>
+                        <div class="qr-container-inline">
+                            <div id="qrCode"></div>
+                            <p style="margin-top: 15px; font-size: 14px; color: #666; font-weight: 700;">📱 Show this to the guard</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Request Pass & Pending Pass in Dual Column -->
+            <div class="dashboard-grid">
+                <!-- Request Pass Section -->
+                <div class="card">
+                    <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 25px;">📝 Request Gate Pass</h2>
+                    <form id="passForm">
+                        <div class="form-group">
+                            <label for="passTypeRegular" style="font-size: 15px; font-weight: 700;">Pass Type</label>
+                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                <button type="button" id="regularEntryBtn" onclick="selectRegularPassType('entry')" class="pass-type-btn" style="flex: 1; padding: 14px; border: 2px solid #667eea; background: #667eea; color: white; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s;">
+                                    🚪 Entry
+                                </button>
+                                <button type="button" id="regularExitBtn" onclick="selectRegularPassType('exit')" class="pass-type-btn" style="flex: 1; padding: 14px; border: 2px solid #ddd; background: white; color: #666; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s;">
+                                    🚶 Exit
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="reason" style="font-size: 15px; font-weight: 700;">Reason</label>
+                            <textarea id="reason" rows="4" placeholder="E.g., Going home, Medical appointment, Family emergency, etc." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="font-size: 16px;">📤 Submit Request</button>
+                    </form>
+                </div>
+
+                <!-- Pending Pass Section -->
+                <div class="card" id="pendingPassCard" style="display:none;">
+                    <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 25px;">⏳ Pending Approval</h2>
+                    <div class="pass-info">
+                        <p style="font-size: 16px;"><strong>Reason:</strong> <span id="pendingReason"></span></p>
+                        <p style="font-size: 16px;"><strong>Requested:</strong> <span id="pendingTime"></span></p>
+                        <p class="status-badge status-pending" style="margin-top: 20px; font-size: 15px;">Status: Pending</p>
+                    </div>
+                    <p style="text-align:center; color:#666; margin-top:30px; font-size: 15px; line-height: 1.6;">⏱️ Waiting for admin approval...</p>
+                </div>
+            </div>
+
+            <!-- Pass History - Full Width -->
+            <div class="card full-width-card">
+                <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">📜 My Pass History</h2>
+                <button onclick="loadPasses()" class="btn btn-secondary" style="margin-bottom:20px; font-weight: 700;">🔄 Refresh History</button>
+                <div id="passHistory"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=dual-layout-2025"></script>
+</body>
+</html>
+

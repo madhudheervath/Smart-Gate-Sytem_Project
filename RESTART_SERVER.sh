@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo "🔄 Restarting Smart Gate Server..."
+echo ""
+echo "Press Ctrl+C in the terminal running uvicorn to stop it"
+echo "Then run:"
+echo ""
+echo "cd /home/madhu/smart\ Gate/backend"
+echo "source ../venv/bin/activate"
+echo "python3 -m uvicorn app:app --reload --port 8080"
+echo ""
+echo "Look for this line in the output:"
+echo "  ✅ Real-time logs module loaded successfully"
+echo ""
+echo "Then try accessing the logs dashboard again!"

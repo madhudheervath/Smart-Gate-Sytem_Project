@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entry/Exit Logs - Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header .breadcrumb {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .header .breadcrumb a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-card.success {
+            border-left-color: #10b981;
+        }
+        
+        .stat-card.warning {
+            border-left-color: #f59e0b;
+        }
+        
+        .stat-card.info {
+            border-left-color: #3b82f6;
+        }
+        
+        .stat-card.danger {
+            border-left-color: #ef4444;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .stat-change {
+            font-size: 13px;
+            margin-top: 8px;
+            color: #10b981;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .chart-card h3 {
+            margin-bottom: 20px;
+            color: #1f2937;
+            font-size: 18px;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .controls input,
+        .controls select {
+            padding: 10px 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .controls button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .controls button:hover {
+            background: #5568d3;
+        }
+        
+        .logs-table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .logs-table-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logs-table-header h3 {
+            font-size: 18px;
+            color: #1f2937;
+        }
+        
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #10b981;
+        }
+        
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .table-wrapper {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            position: sticky;
+            top: 0;
+            background: #f9fafb;
+            z-index: 10;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+        }
+        
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge.entry {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge.exit {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge.expired,
+        .badge.invalid {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="breadcrumb">
+            <a href="index.html" style="color: white; text-decoration: none;">← Back to Admin Dashboard</a>
+        </div>
+        <h1>📊 Entry/Exit Logs & Analytics</h1>
+        <p>Real-time monitoring and reporting</p>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card info">
+            <div class="stat-label">Students in Campus</div>
+            <div class="stat-value" id="studentsInCampus">--</div>
+            <div class="stat-change">Updated in real-time</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-label">Total Scans (7 days)</div>
+            <div class="stat-value" id="totalScans">--</div>
+            <div class="stat-change" id="successRate">--% success rate</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Entries Today</div>
+            <div class="stat-value" id="entriesToday">--</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-label">Exits Today</div>
+            <div class="stat-value" id="exitsToday">--</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>📈 Daily Activity (Last 7 Days)</h3>
+            <canvas id="dailyChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>⏰ Hourly Activity (Today)</h3>
+            <canvas id="hourlyChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Search/Filter Controls -->
+    <div class="controls">
+        <input type="text" id="searchStudent" placeholder="Search by Student ID or Name...">
+        <select id="filterType">
+            <option value="">All Types</option>
+            <option value="entry">Entry Only</option>
+            <option value="exit">Exit Only</option>
+        </select>
+        <select id="filterResult">
+            <option value="">All Results</option>
+            <option value="success">Success</option>
+            <option value="expired">Expired</option>
+            <option value="invalid">Invalid</option>
+        </select>
+        <input type="date" id="filterDateFrom">
+        <input type="date" id="filterDateTo">
+        <button onclick="applyFilters()">🔍 Apply Filters</button>
+        <button onclick="clearFilters()">✕ Clear</button>
+        <button onclick="exportLogs()">📥 Export CSV</button>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="logs-table-container">
+        <div class="logs-table-header">
+            <h3>Recent Scans</h3>
+            <div class="live-indicator">
+                <div class="live-dot"></div>
+                <span>Live Updates</span>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table id="logsTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Result</th>
+                        <th>Gate</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                    <tr>
+                        <td colspan="7" class="loading">
+                            Loading logs...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="logs.js?v=2"></script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+/* Common Styles for All Portals */
+
+/* Loading States */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(102, 126, 234, 0.2);
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Form Validation */
+.form-field {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.form-field input.error,
+.form-field textarea.error {
+    border-color: #dc3545 !important;
+    background-color: #fff5f5 !important;
+}
+
+.field-error {
+    color: #dc3545;
+    font-size: 13px;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+.field-error::before {
+    content: '⚠';
+}
+
+.form-field input.success,
+.form-field textarea.success {
+    border-color: #28a745 !important;
+}
+
+/* Confirmation Dialog */
+.custom-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.dialog-content {
+    position: relative;
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: dialogSlideIn 0.3s ease-out;
+}
+
+@keyframes dialogSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dialog-content h3 {
+    margin: 0 0 15px 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: #333;
+}
+
+.dialog-content p {
+    margin: 0 0 25px 0;
+    color: #666;
+    line-height: 1.6;
+}
+
+.dialog-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+/* Offline Indicator */
+.offline-indicator {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffc107;
+    color: #333;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideUpBounce 0.5s ease-out;
+}
+
+@keyframes slideUpBounce {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(100px);
+    }
+    60% {
+        transform: translateX(-50%) translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: #999;
+}
+
+.empty-state-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-state-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.empty-state-description {
+    font-size: 16px;
+    color: #999;
+}
+
+/* Session Timeout Warning */
+.session-warning {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(255, 152, 0, 0.4);
+    z-index: 9999;
+    max-width: 350px;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(400px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.session-warning h4 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+}
+
+.session-warning p {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* Accessibility - Focus States */
+*:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+button:focus,
+a:focus {
+    outline-offset: 4px;
+}
+
+/* Skip to Main Content (Accessibility) */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #667eea;
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: 0 0 8px 0;
+    z-index: 100;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    body[data-theme="auto"] {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+    
+    body[data-theme="auto"] .card {
+        background: rgba(30, 30, 50, 0.95);
+        color: #e0e0e0;
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    body[data-theme="auto"] .navbar {
+        background: rgba(30, 30, 50, 0.95);
+    }
+}
+
+body[data-theme="dark"] {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+}
+
+body[data-theme="dark"] .card {
+    background: rgba(30, 30, 50, 0.95);
+    color: #e0e0e0;
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+body[data-theme="dark"] .navbar {
+    background: rgba(30, 30, 50, 0.95);
+}
+
+body[data-theme="dark"] input,
+body[data-theme="dark"] textarea {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 20px;
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+/* Print Styles */
+@media print {
+    .navbar,
+    .btn,
+    .theme-toggle,
+    .toast-notification {
+        display: none !important;
+    }
+    
+    .card {
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    body {
+        background: white !important;
+    }
+}
+
+/* Responsive Improvements */
+@media (max-width: 600px) {
+    .dialog-content {
+        padding: 25px;
+        width: 95%;
+    }
+    
+    .dialog-actions {
+        flex-direction: column;
+    }
+    
+    .dialog-actions button {
+        width: 100%;
+    }
+    
+    .toast-notification {
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}
+
+/* Password Strength Indicator */
+.password-strength {
+    margin-top: 8px;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.password-strength-bar {
+    height: 100%;
+    transition: all 0.3s ease;
+    border-radius: 2px;
+}
+
+.password-strength-bar.weak {
+    width: 33%;
+    background: #dc3545;
+}
+
+.password-strength-bar.medium {
+    width: 66%;
+    background: #ffc107;
+}
+
+.password-strength-bar.strong {
+    width: 100%;
+    background: #28a745;
+}
+
+.password-strength-label {
+    font-size: 12px;
+    margin-top: 4px;
+    font-weight: 600;
+}

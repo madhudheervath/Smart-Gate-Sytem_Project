@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Settings - Admin Portal</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        .location-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .settings-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .settings-card h2 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group .help-text {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .current-location {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .current-location h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+        }
+
+        .location-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .location-item {
+            background: rgba(255,255,255,0.2);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .location-item .label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+
+        .location-item .value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 2px solid #e0e0e0;
+            z-index: 1;
+        }
+        
+        .map-info {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="location-container">
+        <a href="index.html" class="back-link">← Back to Dashboard</a>
+
+        <div id="alertMessage" style="display: none;"></div>
+
+        <!-- Login Section (shown if not logged in as admin) -->
+        <div id="loginSection" style="display: none;">
+            <div class="settings-card">
+                <h2>🔐 Admin Login Required</h2>
+                <p style="text-align: center; color: #666; margin-bottom: 20px;">
+                    Please login with admin credentials to configure campus location
+                </p>
+                
+                <!-- Show current logged in user if any -->
+                <div id="currentUserInfo" style="display: none; background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                    <p style="margin: 0; color: #856404; font-weight: 600;">
+                        Currently logged in as: <span id="currentUserEmail"></span>
+                    </p>
+                    <p style="margin: 5px 0 0 0; color: #856404;">
+                        Role: <strong id="currentUserRole"></strong>
+                    </p>
+                    <button type="button" onclick="forceLogout()" class="btn-secondary" style="margin-top: 10px;">
+                        🔄 Logout & Login as Admin
+                    </button>
+                </div>
+                
+                <form id="adminLoginForm" autocomplete="off">
+                    <div class="form-group">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" placeholder="admin@uni.edu" required 
+                               autocomplete="off" value="">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter admin password" required 
+                               autocomplete="new-password" value="">
+                    </div>
+                    <div id="loginError" style="color: #dc3545; margin-bottom: 15px; display: none;"></div>
+                    <button type="submit" class="btn-primary" style="width: 100%;">
+                        🔓 Login as Admin
+                    </button>
+                    <button type="button" onclick="fillAdminCredentials()" class="btn-secondary" style="width: 100%; margin-top: 10px;">
+                        ✏️ Fill Admin Credentials
+                    </button>
+                </form>
+                <p style="text-align: center; margin-top: 20px; font-size: 14px; color: #999;">
+                    <strong>Admin credentials:</strong> admin@uni.edu / admin123
+                </p>
+            </div>
+        </div>
+
+        <!-- Main Content (shown after login) -->
+        <div id="mainContent" style="display: none;">
+
+        <div class="current-location" id="currentLocation">
+            <h3>📍 Current Campus Location</h3>
+            <div class="location-info">
+                <div class="location-item">
+                    <div class="label">Campus Name</div>
+                    <div class="value" id="currentCampusName">Loading...</div>
+                </div>
+                <div class="location-item">
+                    <div class="label">Latitude</div>
+                    <div class="value" id="currentLat">-</div>
+                </div>
+                <div class="location-item">
+                    <div class="label">Longitude</div>
+                    <div class="value" id="currentLon">-</div>
+                </div>
+                <div class="location-item">
+                    <div class="label">Radius</div>
+                    <div class="value" id="currentRadius">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-card">
+            <h2>⚙️ Update Location Settings</h2>
+            <form id="locationForm">
+                <div class="form-group">
+                    <label for="campusName">Campus Name</label>
+                    <input type="text" id="campusName" placeholder="e.g., Campus, College Name" required>
+                    <div class="help-text">This name will be shown in notifications</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="number" id="latitude" step="0.000001" placeholder="e.g., 31.7768" required>
+                    <div class="help-text">GPS latitude of campus center</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="number" id="longitude" step="0.000001" placeholder="e.g., 77.0144" required>
+                    <div class="help-text">GPS longitude of campus center</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="radiusKm">Radius (kilometers)</label>
+                    <input type="number" id="radiusKm" step="0.1" min="0.1" placeholder="e.g., 2.0" required>
+                    <div class="help-text">How far students can be from center (in km)</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-switch">
+                        <span>Enable GPS Geofencing</span>
+                        <label class="switch">
+                            <input type="checkbox" id="enabled" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </label>
+                    <div class="help-text">When enabled, students must be within radius to use daily entry</div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <button type="submit" class="btn-primary">💾 Save Location Settings</button>
+                    <button type="button" class="btn-secondary" onclick="detectLocation()">📍 Use My Location</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="settings-card">
+            <h2>🗺️ Interactive Map Preview</h2>
+            <div id="map"></div>
+            <div class="map-info">
+                <strong>📍 Center:</strong> <span id="mapCoords">Loading...</span> | 
+                <strong>📏 Radius:</strong> <span id="mapRadius">-</span> | 
+                <strong>🎯 Click map to set location</strong>
+            </div>
+        </div>
+
+        </div>
+        <!-- End of Main Content -->
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        const API_BASE = window.location.origin;
+        let token = localStorage.getItem('token');
+
+        // Check if user is logged in and is admin
+        async function checkAdminAccess() {
+            if (!token) {
+                console.log('No token found, showing login form');
+                showLoginForm();
+                return false;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Not authenticated');
+                }
+
+                const user = await response.json();
+                
+                if (user.role !== 'admin') {
+                    console.log(`User role is ${user.role}, not admin`);
+                    showAlert(`⚠️ Current role: ${user.role}. Please login as admin.`, 'error');
+                    
+                    // Show current user info
+                    document.getElementById('currentUserEmail').textContent = user.email;
+                    document.getElementById('currentUserRole').textContent = user.role;
+                    document.getElementById('currentUserInfo').style.display = 'block';
+                    
+                    showLoginForm();
+                    return false;
+                }
+
+                console.log('✅ Admin access confirmed:', user.name, user.role);
+                showMainContent();
+                return true;
+            } catch (error) {
+                console.error('Authentication error:', error);
+                localStorage.removeItem('token');
+                token = null;
+                showLoginForm();
+                return false;
+            }
+        }
+
+        // Fill admin credentials
+        function fillAdminCredentials() {
+            document.getElementById('loginEmail').value = 'admin@uni.edu';
+            document.getElementById('loginPassword').value = 'admin123';
+            document.getElementById('loginError').style.display = 'none';
+            showAlert('✅ Admin credentials filled! Click "Login as Admin" to continue.', 'success');
+        }
+
+        // Force logout
+        function forceLogout() {
+            console.log('🔄 Force logout - clearing all tokens');
+            localStorage.removeItem('token');
+            localStorage.clear();
+            sessionStorage.clear();
+            token = null;
+            
+            // Hide current user info
+            document.getElementById('currentUserInfo').style.display = 'none';
+            
+            // Clear form
+            document.getElementById('loginEmail').value = '';
+            document.getElementById('loginPassword').value = '';
+            
+            showAlert('✅ Logged out successfully. Please login as admin.', 'success');
+        }
+
+        // Show login form
+        function showLoginForm() {
+            // Clear form fields to prevent autocomplete issues
+            document.getElementById('loginEmail').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('loginError').style.display = 'none';
+            
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        // Show main content
+        function showMainContent() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+
+        // Handle admin login
+        document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            errorDiv.style.display = 'none';
+            
+            // Clear any existing token first
+            console.log('🔐 Clearing old token before login...');
+            localStorage.removeItem('token');
+            token = null;
+            
+            try {
+                // Login request
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+                
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Invalid credentials');
+                }
+                
+                const data = await response.json();
+                
+                // Check if user is admin
+                if (data.role !== 'admin') {
+                    errorDiv.textContent = `Access denied. This page is for admins only. Your role: ${data.role}`;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                // Save token
+                token = data.access_token;
+                localStorage.setItem('token', token);
+                
+                showAlert(`✅ Welcome ${data.name}! Logged in as admin.`, 'success');
+                
+                // Show main content
+                showMainContent();
+                
+                // Load location settings
+                loadCurrentSettings();
+                
+            } catch (error) {
+                errorDiv.textContent = 'Login failed: ' + error.message;
+                errorDiv.style.display = 'block';
+            }
+        });
+
+        // Map variables
+        let map = null;
+        let marker = null;
+        let circle = null;
+
+        // Initialize Leaflet map
+        function initMap(lat = 31.7768, lon = 77.0144, radius = 2.0) {
+            if (map) {
+                map.remove();
+            }
+
+            // Create map centered on coordinates
+            map = L.map('map').setView([lat, lon], 13);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Add marker for center
+            marker = L.marker([lat, lon], {
+                draggable: true,
+                title: 'Campus Center'
+            }).addTo(map);
+
+            marker.bindPopup(`<b>📍 Campus Center</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`).openPopup();
+
+            // Add circle for radius
+            circle = L.circle([lat, lon], {
+                color: '#667eea',
+                fillColor: '#667eea',
+                fillOpacity: 0.2,
+                radius: radius * 1000  // Convert km to meters
+            }).addTo(map);
+
+            // Update coordinates when marker is dragged
+            marker.on('dragend', function(e) {
+                const position = marker.getLatLng();
+                document.getElementById('latitude').value = position.lat.toFixed(6);
+                document.getElementById('longitude').value = position.lng.toFixed(6);
+                updateMapPreview();
+            });
+
+            // Allow clicking on map to set location
+            map.on('click', function(e) {
+                const lat = e.latlng.lat;
+                const lon = e.latlng.lng;
+                document.getElementById('latitude').value = lat.toFixed(6);
+                document.getElementById('longitude').value = lon.toFixed(6);
+                updateMapPreview();
+            });
+
+            updateMapInfo(lat, lon, radius);
+        }
+
+        // Update map when coordinates change
+        function updateMapPreview() {
+            const lat = parseFloat(document.getElementById('latitude').value);
+            const lon = parseFloat(document.getElementById('longitude').value);
+            const radius = parseFloat(document.getElementById('radiusKm').value);
+
+            if (!lat || !lon || !radius) return;
+
+            // Update marker position
+            if (marker) {
+                marker.setLatLng([lat, lon]);
+                marker.bindPopup(`<b>📍 Campus Center</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`);
+            }
+
+            // Update circle
+            if (circle) {
+                circle.setLatLng([lat, lon]);
+                circle.setRadius(radius * 1000);  // Convert km to meters
+            }
+
+            // Center map
+            if (map) {
+                map.setView([lat, lon], 13);
+            }
+
+            updateMapInfo(lat, lon, radius);
+        }
+
+        // Update map info display
+        function updateMapInfo(lat, lon, radius) {
+            document.getElementById('mapCoords').textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+            document.getElementById('mapRadius').textContent = `${radius.toFixed(1)} km`;
+        }
+
+        // Load current settings
+        async function loadCurrentSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/location`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.status === 403) {
+                    showAlert('❌ Access Denied: You must be logged in as admin', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/frontend/admin/index.html';
+                    }, 2000);
+                    return;
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'Failed to load settings');
+                }
+
+                const settings = await response.json();
+                
+                // Update current location display
+                document.getElementById('currentCampusName').textContent = settings.campus_name;
+                document.getElementById('currentLat').textContent = settings.latitude.toFixed(6);
+                document.getElementById('currentLon').textContent = settings.longitude.toFixed(6);
+                document.getElementById('currentRadius').textContent = `${settings.radius_km} km`;
+
+                // Populate form
+                document.getElementById('campusName').value = settings.campus_name;
+                document.getElementById('latitude').value = settings.latitude;
+                document.getElementById('longitude').value = settings.longitude;
+                document.getElementById('radiusKm').value = settings.radius_km;
+                document.getElementById('enabled').checked = settings.enabled;
+
+                // Initialize map with loaded settings
+                initMap(settings.latitude, settings.longitude, settings.radius_km);
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                showAlert('Failed to load current settings', 'error');
+                // Initialize with defaults on error
+                initMap();
+            }
+        }
+
+        // Update map preview on input
+        document.getElementById('latitude').addEventListener('input', updateMapPreview);
+        document.getElementById('longitude').addEventListener('input', updateMapPreview);
+        document.getElementById('radiusKm').addEventListener('input', updateMapPreview);
+
+        // Detect current location
+        function detectLocation() {
+            if (!navigator.geolocation) {
+                showAlert('Geolocation is not supported by your browser', 'error');
+                return;
+            }
+
+            showAlert('Detecting your location...', 'success');
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
+                    document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
+                    updateMapPreview();
+                    showAlert('Location detected successfully!', 'success');
+                },
+                (error) => {
+                    showAlert('Failed to detect location: ' + error.message, 'error');
+                }
+            );
+        }
+
+        // Save settings
+        document.getElementById('locationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const settings = {
+                campus_name: document.getElementById('campusName').value,
+                latitude: parseFloat(document.getElementById('latitude').value),
+                longitude: parseFloat(document.getElementById('longitude').value),
+                radius_km: parseFloat(document.getElementById('radiusKm').value),
+                enabled: document.getElementById('enabled').checked
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/api/admin/location`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (!response.ok) {
+                    // Try to get error message from response
+                    let errorMsg = 'Failed to update settings';
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = errorData.detail || errorData.message || errorMsg;
+                    } catch (e) {
+                        // If response is not JSON, use status text
+                        errorMsg = await response.text() || response.statusText;
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                const result = await response.json();
+                showAlert('✅ Location settings updated successfully!', 'success');
+                
+                // Reload current settings
+                setTimeout(() => loadCurrentSettings(), 500);
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('❌ ' + error.message, 'error');
+            }
+        });
+
+        // Show alert
+        function showAlert(message, type) {
+            const alert = document.getElementById('alertMessage');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load on page load - but check admin access first
+        (async function initializePage() {
+            const hasAccess = await checkAdminAccess();
+            if (hasAccess) {
+                loadCurrentSettings();
+            }
+        })();
+    </script>
+</body>
+</html>
