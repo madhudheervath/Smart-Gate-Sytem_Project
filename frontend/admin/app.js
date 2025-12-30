@@ -28,7 +28,16 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
             body: formData
         });
 
-        if (!res.ok) throw new Error('Invalid credentials');
+        if (!res.ok) {
+            let errorMessage = 'Login failed';
+            try {
+                const errorData = await res.json();
+                errorMessage = errorData.detail || errorData.message || 'Invalid credentials';
+            } catch (e) {
+                errorMessage = `Server Error (${res.status})`;
+            }
+            throw new Error(errorMessage);
+        }
 
         const data = await res.json();
         token = data.access_token;
