@@ -21,11 +21,22 @@ users = [
 ]
 
 for name, email, role, pwd, sid in users:
-    if not db.query(User).filter_by(email=email).first():
+    user = db.query(User).filter_by(email=email).first()
+    if user:
+        # Update existing user
+        user.name = name
+        user.role = role
+        user.pwd_hash = hash_pwd(pwd)
+        if sid:
+            user.student_id = sid
+        print(f"Updated user: {email}")
+    else:
+        # Create new user
         user = User(name=name, email=email, role=role, pwd_hash=hash_pwd(pwd))
         if sid:
             user.student_id = sid
         db.add(user)
+        print(f"Created user: {email}")
 
 db.commit()
 db.close()
