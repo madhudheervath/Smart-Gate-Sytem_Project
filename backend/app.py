@@ -61,6 +61,14 @@ def now_ist():
 
 app = FastAPI(title="GatePass QR Prototype")
 
+@app.get("/debug/users")
+def list_users(db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return [
+        {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "student_id": u.student_id, "active": u.active}
+        for u in users
+    ]
+
 # CORS middleware for web frontend
 app.add_middleware(
     CORSMiddleware,
