@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080';
+const API_BASE = CONFIG.API_BASE;
 let token = localStorage.getItem('token');
 let currentUser = null;
 let selectedPassType = 'entry'; // Default to entry
@@ -54,14 +54,14 @@ async function loadUserInfo() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         currentUser = await res.json();
-        
+
         // Display user name and student ID if available
         let displayText = currentUser.name;
         if (currentUser.student_id) {
             displayText += ` (${currentUser.student_id})`;
         }
         document.getElementById('userName').textContent = displayText;
-        
+
         // Show student details if available
         if (currentUser.student_id && document.getElementById('studentInfo')) {
             const validUntil = currentUser.valid_until ? new Date(currentUser.valid_until).toLocaleDateString() : 'N/A';
@@ -72,10 +72,10 @@ async function loadUserInfo() {
             `;
             document.getElementById('studentInfo').style.display = 'block';
         }
-        
+
         // Load face authentication status
         loadFaceStatus();
-        
+
         // Initialize notification card
         initializeNotificationCard();
     } catch (err) {
@@ -90,7 +90,7 @@ function getCurrentLocation() {
             reject(new Error('Geolocation not supported'));
             return;
         }
-        
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 currentLocation = {
@@ -121,10 +121,10 @@ async function loadFaceStatus() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const status = await res.json();
-        
+
         const faceStatusDiv = document.getElementById('faceStatus');
         const faceRegForm = document.getElementById('faceRegForm');
-        
+
         if (status.face_registered) {
             const regDate = new Date(status.face_registered_at).toLocaleDateString();
             faceStatusDiv.innerHTML = `
@@ -144,9 +144,9 @@ async function loadFaceStatus() {
             `;
             faceRegForm.style.display = 'block';
         }
-        
+
         document.getElementById('faceRegCard').style.display = 'block';
-        
+
     } catch (err) {
         console.error('Failed to load face status', err);
     }
@@ -156,12 +156,12 @@ function handleFaceImage(input) {
     if (input.files && input.files[0]) {
         selectedFaceFile = input.files[0];
         const reader = new FileReader();
-        
-        reader.onload = function(e) {
+
+        reader.onload = function (e) {
             document.getElementById('previewImg').src = e.target.result;
             document.getElementById('imagePreview').style.display = 'block';
         };
-        
+
         reader.readAsDataURL(input.files[0]);
     }
 }
@@ -171,32 +171,32 @@ async function uploadFace() {
         alert('Please select a photo first');
         return;
     }
-    
+
     const formData = new FormData();
     formData.append('file', selectedFaceFile);
-    
+
     try {
         const res = await fetch(`${API_BASE}/api/register_face`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
-        
+
         if (!res.ok) {
             const error = await res.json();
             throw new Error(error.detail || 'Failed to register face');
         }
-        
+
         const result = await res.json();
         alert('✅ ' + result.message);
-        
+
         // Reset form and reload status
         document.getElementById('faceImage').value = '';
         document.getElementById('imagePreview').style.display = 'none';
         selectedFaceFile = null;
-        
+
         loadFaceStatus();
-        
+
     } catch (err) {
         alert('❌ ' + err.message);
     }
@@ -207,16 +207,16 @@ function logout() {
     localStorage.removeItem('token');
     token = null;
     currentUser = null;
-    
+
     // Clear contact form fields to prevent data persistence
     document.getElementById('studentPhone').value = '';
     document.getElementById('parentName').value = '';
     document.getElementById('parentPhone').value = '';
-    
+
     // Clear login form
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
-    
+
     showPage('loginPage');
 }
 
@@ -228,7 +228,7 @@ function selectPassType(type) {
     selectedPassType = type;
     const entryBtn = document.getElementById('entryBtn');
     const exitBtn = document.getElementById('exitBtn');
-    
+
     if (type === 'entry') {
         entryBtn.style.background = 'white';
         entryBtn.style.color = '#667eea';
@@ -249,10 +249,10 @@ function selectPassType(type) {
 // Regular Pass Type Selection (for admin-approved passes)
 function selectRegularPassType(type) {
     selectedRegularPassType = type;
-    
+
     const entryBtn = document.getElementById('regularEntryBtn');
     const exitBtn = document.getElementById('regularExitBtn');
-    
+
     if (type === 'entry') {
         entryBtn.style.background = '#667eea';
         entryBtn.style.color = 'white';
@@ -273,11 +273,11 @@ function selectRegularPassType(type) {
 async function requestDailyEntry() {
     try {
         const passLabel = selectedPassType === 'entry' ? 'Entry' : 'Exit';
-        
+
         console.log('=== GENERATING DAILY PASS ===');
         console.log('Selected pass type:', selectedPassType);
         console.log('Pass label:', passLabel);
-        
+
         // Get GPS location
         let location = null;
         try {
@@ -289,14 +289,14 @@ async function requestDailyEntry() {
                 return;
             }
         }
-        
-        const requestBody = { 
+
+        const requestBody = {
             pass_type: selectedPassType,
             latitude: location ? location.latitude : null,
             longitude: location ? location.longitude : null
         };
         console.log('Request body:', JSON.stringify(requestBody));
-        
+
         const res = await fetch(`${API_BASE}/passes/daily-entry`, {
             method: 'POST',
             headers: {
@@ -312,14 +312,14 @@ async function requestDailyEntry() {
         }
 
         const pass = await res.json();
-        
+
         console.log('Pass created:', pass);
         console.log('Pass type in response:', pass.pass_type);
         console.log('Pass reason:', pass.reason);
-        
+
         // Show success message with QR immediately
         alert(`✅ Daily ${passLabel} Pass Generated!\n\n${pass.reason}\n\nYour QR code is ready to use.\nValid until: ` + new Date(pass.expiry_time).toLocaleTimeString());
-        
+
         // Refresh to show QR
         loadPasses();
     } catch (err) {
@@ -354,7 +354,7 @@ document.getElementById('passForm')?.addEventListener('submit', async (e) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 reason: reason,
                 pass_type: selectedRegularPassType,
                 latitude: location ? location.latitude : null,
@@ -431,7 +431,7 @@ function showPendingPass(pass) {
 
 function showPassHistory(passes) {
     const historyDiv = document.getElementById('passHistory');
-    
+
     if (passes.length === 0) {
         historyDiv.innerHTML = '<div class="empty-state">No pass requests yet</div>';
         return;
@@ -484,7 +484,7 @@ async function enableStudentNotifications() {
 
         // Request permission
         const permission = await Notification.requestPermission();
-        
+
         if (permission !== 'granted') {
             alert('Please enable notifications in your browser settings to receive pass updates');
             return;
@@ -492,7 +492,7 @@ async function enableStudentNotifications() {
 
         // Generate simulated FCM token (in production, use Firebase SDK)
         studentFCMToken = generateSimulatedFCMToken();
-        
+
         // Register token with backend
         const response = await fetch(`${API_BASE}/api/register_fcm_token`, {
             method: 'POST',
@@ -505,19 +505,19 @@ async function enableStudentNotifications() {
 
         if (response.ok) {
             updateNotificationStatus('enabled');
-            
+
             // Show contact form
             document.getElementById('contactForm').style.display = 'block';
             document.getElementById('enableNotifBtn').style.display = 'none';
-            
+
             // Show parent portal link
             generateParentPortalLink();
-            
+
             // Send test notification
             setTimeout(() => {
                 sendTestNotification('✅ Notifications enabled! You will receive updates about your gate passes.');
             }, 1000);
-            
+
         } else {
             throw new Error('Failed to register for notifications');
         }
@@ -555,10 +555,10 @@ async function saveContactInfo() {
 
         if (response.ok) {
             alert('✅ Contact information saved! Your parents will now receive notifications when you enter/exit campus.');
-            
+
             // Update parent portal link with student info
             generateParentPortalLink();
-            
+
         } else {
             throw new Error('Failed to save contact information');
         }
@@ -575,10 +575,10 @@ function generateParentPortalLink() {
         const baseUrl = window.location.origin;
         // Make sure to include index.html in the URL
         const parentUrl = `${baseUrl}/frontend/parent/index.html?student_id=${encodeURIComponent(currentUser.student_id || '')}&student_name=${encodeURIComponent(currentUser.name || '')}`;
-        
+
         document.getElementById('parentLinkInput').value = parentUrl;
         document.getElementById('parentPortalLink').style.display = 'block';
-        
+
         console.log('Generated parent portal link:', parentUrl);
     }
 }
@@ -588,7 +588,7 @@ function copyParentLink() {
     const linkInput = document.getElementById('parentLinkInput');
     linkInput.select();
     linkInput.setSelectionRange(0, 99999); // For mobile devices
-    
+
     try {
         document.execCommand('copy');
         alert('✅ Link copied! Share this with your parent to setup their notifications.');
@@ -600,7 +600,7 @@ function copyParentLink() {
 // Update notification status display
 function updateNotificationStatus(status) {
     const statusDiv = document.getElementById('notificationStatus');
-    
+
     if (status === 'enabled') {
         statusDiv.innerHTML = `
             <div style="padding:15px; background:rgba(255,255,255,0.2); border-radius:12px; backdrop-filter:blur(10px);">
@@ -638,7 +638,7 @@ function sendTestNotification(message) {
             tag: 'test-notification'
         });
 
-        notification.onclick = function() {
+        notification.onclick = function () {
             window.focus();
             notification.close();
         };
@@ -654,12 +654,12 @@ function sendTestNotification(message) {
 function initializeNotificationCard() {
     if (currentUser) {
         document.getElementById('notificationCard').style.display = 'block';
-        
+
         // Clear all fields first to prevent old data from showing
         document.getElementById('studentPhone').value = '';
         document.getElementById('parentName').value = '';
         document.getElementById('parentPhone').value = '';
-        
+
         // Pre-fill contact form with CURRENT user's data ONLY if they exist
         if (currentUser.phone) {
             document.getElementById('studentPhone').value = currentUser.phone;
@@ -670,12 +670,12 @@ function initializeNotificationCard() {
         if (currentUser.parent_phone) {
             document.getElementById('parentPhone').value = currentUser.parent_phone;
         }
-        
+
         console.log('Contact form initialized for:', currentUser.name);
         console.log('Phone:', currentUser.phone || 'Not set');
         console.log('Parent Name:', currentUser.parent_name || 'Not set');
         console.log('Parent Phone:', currentUser.parent_phone || 'Not set');
-        
+
         // Check if notifications are already enabled
         if (Notification.permission === 'granted') {
             updateNotificationStatus('enabled');
@@ -703,29 +703,29 @@ async function requestEmergencyExit() {
         "• Create an emergency log entry\n\n" +
         "Click OK to proceed with emergency exit."
     );
-    
+
     if (!confirmed) {
         return;
     }
-    
+
     // Ask for reason
     const reason = prompt(
         "Please briefly describe the emergency:\n" +
         "(e.g., Medical emergency, Family emergency, Urgent situation)",
         "Emergency situation"
     );
-    
+
     if (!reason || reason.trim() === '') {
         alert("❌ Emergency exit cancelled - reason required");
         return;
     }
-    
+
     try {
         // Show loading
         const originalBtn = event.target;
         originalBtn.disabled = true;
         originalBtn.textContent = '⏳ Processing Emergency Exit...';
-        
+
         const response = await fetch(`${API_BASE}/api/emergency_exit`, {
             method: 'POST',
             headers: {
@@ -736,13 +736,13 @@ async function requestEmergencyExit() {
                 reason: reason.trim()
             })
         });
-        
+
         if (!response.ok) {
             throw new Error('Emergency exit request failed');
         }
-        
+
         const data = await response.json();
-        
+
         // Show success message
         alert(
             "✅ EMERGENCY EXIT GRANTED\n\n" +
@@ -753,7 +753,7 @@ async function requestEmergencyExit() {
             "Admins have been notified.\n\n" +
             "Stay safe!"
         );
-        
+
         // Show success notification
         if (Notification.permission === 'granted') {
             new Notification('🚨 Emergency Exit Granted', {
@@ -763,16 +763,16 @@ async function requestEmergencyExit() {
                 tag: 'emergency-exit'
             });
         }
-        
+
         // Reset button
         originalBtn.disabled = false;
         originalBtn.textContent = '🚨 Request Emergency Exit';
-        
+
         // Optionally reload passes to show the emergency exit log
         setTimeout(() => {
             loadPasses();
         }, 1000);
-        
+
     } catch (error) {
         console.error('Emergency exit error:', error);
         alert(
@@ -781,7 +781,7 @@ async function requestEmergencyExit() {
             "Please contact security immediately or proceed to the gate.\n\n" +
             "Error: " + error.message
         );
-        
+
         // Reset button
         if (event && event.target) {
             event.target.disabled = false;

@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080';
+const API_BASE = CONFIG.API_BASE;
 let token = localStorage.getItem('scannerToken');
 let currentUser = null;
 let video = null;
@@ -72,21 +72,21 @@ async function loadStats() {
         const res = await fetch(`${API_BASE}/scans/stats`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!res.ok) {
             throw new Error(`Stats API returned ${res.status}`);
         }
-        
+
         const stats = await res.json();
         console.log('Stats loaded:', stats);
-        
+
         document.getElementById('totalTodayCount').textContent = stats.total_today || 0;
         document.getElementById('entryTodayCount').textContent = stats.entry_today || 0;
         document.getElementById('exitTodayCount').textContent = stats.exit_today || 0;
         document.getElementById('successTodayCount').textContent = stats.success_today || 0;
         document.getElementById('failedTodayCount').textContent = stats.failed_today || 0;
         document.getElementById('totalAllTimeCount').textContent = stats.total_all_time || 0;
-        
+
         console.log('Stats updated in UI');
     } catch (err) {
         console.error('Failed to load stats:', err);
@@ -119,7 +119,7 @@ function initializeScanner() {
 function switchMode(mode) {
     document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.scanner-mode').forEach(m => m.classList.remove('active'));
-    
+
     if (mode === 'camera') {
         document.getElementById('cameraBtn').classList.add('active');
         document.getElementById('cameraMode').classList.add('active');
@@ -128,7 +128,7 @@ function switchMode(mode) {
         document.getElementById('manualMode').classList.add('active');
         stopCamera();
     }
-    
+
     hideResult();
 }
 
@@ -138,20 +138,20 @@ async function startCamera() {
     if (window.sequentialScanner) {
         return await window.sequentialScanner.start();
     }
-    
+
     // Fallback to old method
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
         });
         video.srcObject = stream;
         video.setAttribute('playsinline', true);
         video.play();
-        
+
         scanning = true;
         document.getElementById('startBtn').style.display = 'none';
         document.getElementById('stopBtn').style.display = 'block';
-        
+
         requestAnimationFrame(scanFrame);
     } catch (err) {
         alert('Unable to access camera: ' + err.message);
@@ -164,14 +164,14 @@ function stopCamera() {
     if (window.sequentialScanner) {
         return window.sequentialScanner.stop();
     }
-    
+
     // Fallback to old method
     scanning = false;
     if (video && video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
-    
+
     document.getElementById('startBtn').style.display = 'block';
     document.getElementById('stopBtn').style.display = 'none';
 }
@@ -179,17 +179,17 @@ function stopCamera() {
 // Scan frame
 function scanFrame() {
     if (!scanning) return;
-    
+
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
         canvas.height = video.videoHeight;
         canvas.width = video.videoWidth;
         canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
+
         const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: "dontInvert",
         });
-        
+
         if (code && !scanCooldown) {
             scanCooldown = true;
             // Use face verification if available
@@ -201,7 +201,7 @@ function scanFrame() {
             setTimeout(() => { scanCooldown = false; }, 3000);
         }
     }
-    
+
     requestAnimationFrame(scanFrame);
 }
 
@@ -211,7 +211,7 @@ async function verifyToken(token_str) {
         // Use FormData to match backend expectations
         const formData = new FormData();
         formData.append('token', token_str);
-        
+
         const res = await fetch(`${API_BASE}/verify`, {
             method: 'POST',
             headers: {
@@ -221,12 +221,12 @@ async function verifyToken(token_str) {
         });
 
         const data = await res.json();
-        
+
         if (res.ok) {
-            const studentInfo = data.student_name ? 
-                `${data.student_name} (${data.student_code})` : 
+            const studentInfo = data.student_name ?
+                `${data.student_name} (${data.student_code})` :
                 `Student #${data.student_id}`;
-            showResult('success', '✅ GRANTED', 
+            showResult('success', '✅ GRANTED',
                 `Pass #${data.pass_id}<br>${studentInfo}`);
             playSound('success');
             // Reload recent scans and stats
@@ -255,7 +255,7 @@ async function verifyManual() {
         alert('Please enter a token');
         return;
     }
-    
+
     await verifyToken(token_str);
     document.getElementById('manualToken').value = '';
 }
@@ -269,7 +269,7 @@ function showResult(type, title, message) {
         <div style="font-size:32px; margin-bottom:10px;">${title}</div>
         <div style="font-size:16px; font-weight:normal;">${message}</div>
     `;
-    
+
     setTimeout(() => {
         resultDiv.classList.remove('show');
     }, 5000);
@@ -286,16 +286,16 @@ function playSound(type) {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
-        
+
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        
+
         oscillator.frequency.value = type === 'success' ? 800 : 400;
         oscillator.type = 'sine';
-        
+
         gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        
+
         oscillator.start(audioCtx.currentTime);
         oscillator.stop(audioCtx.currentTime + 0.5);
     } catch (err) {
@@ -306,29 +306,29 @@ function playSound(type) {
 // Load recent scans
 async function loadRecentScans() {
     const container = document.getElementById('recentScans');
-    
+
     try {
         const res = await fetch(`${API_BASE}/scans?limit=20`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!res.ok) throw new Error('Failed to load scans');
-        
+
         const scans = await res.json();
-        
+
         if (scans.length === 0) {
             container.innerHTML = '<div class="empty-state">No scans yet</div>';
             return;
         }
-        
+
         container.innerHTML = scans.map(scan => {
             const timeStr = new Date(scan.scan_time).toLocaleString();
-            const studentInfo = scan.student_name ? 
-                `${scan.student_name} (${scan.student_code})` : 
+            const studentInfo = scan.student_name ?
+                `${scan.student_name} (${scan.student_code})` :
                 `Student #${scan.student_id}`;
             const resultClass = scan.result === 'success' ? 'success' : 'error';
             const resultIcon = scan.result === 'success' ? '✅' : '❌';
-            
+
             return `
                 <div class="scan-item scan-${resultClass}">
                     <div class="scan-header">
@@ -343,7 +343,7 @@ async function loadRecentScans() {
                 </div>
             `;
         }).join('');
-        
+
     } catch (err) {
         container.innerHTML = '<div class="empty-state">Failed to load scans</div>';
         console.error('Error loading scans:', err);

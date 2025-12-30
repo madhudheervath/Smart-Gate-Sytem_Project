@@ -3,8 +3,8 @@
  * WebSocket + Chart.js + Live Updates
  */
 
-const API_BASE = 'http://localhost:8080';
-const WS_BASE = 'ws://localhost:8080';
+const API_BASE = CONFIG.API_BASE;
+const WS_BASE = CONFIG.API_BASE.replace('http', 'ws');
 
 let authToken = localStorage.getItem('token');
 let currentUser = null;
@@ -14,27 +14,27 @@ let ws = null;
 let allLogs = [];
 
 // Initialize dashboard
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     console.log('📊 Initializing Real-Time Logs Dashboard...');
-    
+
     // Always try to get the latest token
     authToken = localStorage.getItem('token');
     console.log('Token check:', authToken ? 'Found (length: ' + authToken.length + ')' : 'Not found');
-    
+
     // Load dashboard components regardless
     // Backend will handle authentication
     console.log('Loading dashboard components...');
-    
+
     try {
         loadStatistics();
         loadDailyChart();
         loadHourlyChart();
         loadRecentLogs();
         connectWebSocket();
-        
+
         // Auto-refresh statistics every 30 seconds
         setInterval(loadStatistics, 30000);
-        
+
         console.log('✅ All components initialized');
     } catch (error) {
         console.error('❌ Error initializing dashboard:', error);
@@ -54,20 +54,20 @@ async function loadStatistics() {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (!response.ok) {
             console.error('Failed to load statistics:', response.status, response.statusText);
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const stats = await response.json();
-        
+
         document.getElementById('studentsInCampus').textContent = stats.students_in_campus;
         document.getElementById('totalScans').textContent = stats.total_scans;
         document.getElementById('successRate').textContent = `${stats.success_rate}% success rate`;
         document.getElementById('entriesToday').textContent = stats.entries;
         document.getElementById('exitsToday').textContent = stats.exits;
-        
+
         console.log('✅ Statistics loaded:', stats);
     } catch (error) {
         console.error('❌ Error loading statistics:', error);
@@ -92,17 +92,17 @@ async function loadDailyChart() {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (!response.ok) throw new Error('Failed to load daily stats');
-        
+
         const data = await response.json();
-        
+
         const ctx = document.getElementById('dailyChart').getContext('2d');
-        
+
         if (dailyChart) {
             dailyChart.destroy();
         }
-        
+
         dailyChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -146,7 +146,7 @@ async function loadDailyChart() {
                 }
             }
         });
-        
+
         console.log('✅ Daily chart loaded');
     } catch (error) {
         console.error('❌ Error loading daily chart:', error);
@@ -161,17 +161,17 @@ async function loadHourlyChart() {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (!response.ok) throw new Error('Failed to load hourly stats');
-        
+
         const data = await response.json();
-        
+
         const ctx = document.getElementById('hourlyChart').getContext('2d');
-        
+
         if (hourlyChart) {
             hourlyChart.destroy();
         }
-        
+
         hourlyChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -217,7 +217,7 @@ async function loadHourlyChart() {
                 }
             }
         });
-        
+
         console.log('✅ Hourly chart loaded');
     } catch (error) {
         console.error('❌ Error loading hourly chart:', error);
@@ -236,14 +236,14 @@ async function loadRecentLogs() {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (!response.ok) throw new Error('Failed to load logs');
-        
+
         const data = await response.json();
         allLogs = data.logs || [];
-        
+
         renderLogs(allLogs);
-        
+
         console.log(`✅ Loaded ${allLogs.length} logs`);
     } catch (error) {
         console.error('❌ Error loading logs:', error);
@@ -253,12 +253,12 @@ async function loadRecentLogs() {
 
 function renderLogs(logs) {
     const tbody = document.getElementById('logsTableBody');
-    
+
     if (!logs || logs.length === 0) {
         showEmptyState('No logs found');
         return;
     }
-    
+
     tbody.innerHTML = logs.map(log => `
         <tr ${log.emergency ? 'style="background: #fff5f5; border-left: 4px solid #dc3545;"' : ''}>
             <td>
@@ -305,15 +305,15 @@ function showEmptyState(message) {
 function connectWebSocket() {
     try {
         ws = new WebSocket(`${WS_BASE}/ws/logs`);
-        
+
         ws.onopen = () => {
             console.log('✅ WebSocket connected - Real-time updates active');
         };
-        
+
         ws.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                
+
                 if (message.type === 'initial') {
                     console.log('📦 Received initial data');
                 } else if (message.type === 'new_scan') {
@@ -324,23 +324,23 @@ function connectWebSocket() {
                 console.error('Error parsing WebSocket message:', error);
             }
         };
-        
+
         ws.onerror = (error) => {
             console.error('❌ WebSocket error:', error);
         };
-        
+
         ws.onclose = () => {
             console.log('⚠️  WebSocket disconnected. Reconnecting in 5s...');
             setTimeout(connectWebSocket, 5000);
         };
-        
+
         // Send ping every 30 seconds to keep connection alive
         setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send('ping');
             }
         }, 30000);
-        
+
     } catch (error) {
         console.error('❌ Error connecting WebSocket:', error);
     }
@@ -349,18 +349,18 @@ function connectWebSocket() {
 function handleNewScan(scanData) {
     // Add to beginning of logs array
     allLogs.unshift(scanData);
-    
+
     // Keep only last 100 logs in memory
     if (allLogs.length > 100) {
         allLogs.pop();
     }
-    
+
     // Re-render table
     renderLogs(allLogs);
-    
+
     // Update statistics
     loadStatistics();
-    
+
     // Show notification (optional)
     showNotification(scanData);
 }
@@ -380,7 +380,7 @@ async function applyFilters() {
     const result = document.getElementById('filterResult').value;
     const dateFrom = document.getElementById('filterDateFrom').value;
     const dateTo = document.getElementById('filterDateTo').value;
-    
+
     try {
         const token = localStorage.getItem('token');
         const params = new URLSearchParams();
@@ -389,20 +389,20 @@ async function applyFilters() {
         if (result) params.append('result', result);
         if (dateFrom) params.append('date_from', `${dateFrom}T00:00:00`);
         if (dateTo) params.append('date_to', `${dateTo}T23:59:59`);
-        
+
         const response = await fetch(`${API_BASE}/api/logs/search?${params}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (!response.ok) throw new Error('Search failed');
-        
+
         const data = await response.json();
         allLogs = data.logs || [];
-        
+
         renderLogs(allLogs);
-        
+
         console.log(`🔍 Search returned ${allLogs.length} results`);
     } catch (error) {
         console.error('❌ Error applying filters:', error);
@@ -416,7 +416,7 @@ function clearFilters() {
     document.getElementById('filterResult').value = '';
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
-    
+
     loadRecentLogs();
 }
 
@@ -429,7 +429,7 @@ function exportLogs() {
         alert('No logs to export');
         return;
     }
-    
+
     // Create CSV content
     const headers = ['Timestamp', 'Student ID', 'Student Name', 'Type', 'Result', 'Gate', 'Details'];
     const rows = allLogs.map(log => [
@@ -441,12 +441,12 @@ function exportLogs() {
         log.gate,
         log.details || ''
     ]);
-    
+
     const csvContent = [
         headers.join(','),
         ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
-    
+
     // Download file
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -457,6 +457,6 @@ function exportLogs() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    
+
     console.log('📥 Exported', allLogs.length, 'logs to CSV');
 }

@@ -1,9 +1,7 @@
 // Configuration and Environment Settings
 const CONFIG = {
-    // API Base URL - automatically detects environment
-    API_BASE: window.location.hostname === 'localhost' 
-        ? 'http://localhost:8080'
-        : window.location.origin,
+    // API Base URL - Render Backend
+    API_BASE: 'https://smart-gate-sytem-project.onrender.com',
     
     // Feature flags
     FEATURES: {

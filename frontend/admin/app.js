@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080';
+const API_BASE = CONFIG.API_BASE;
 let token = localStorage.getItem('adminToken');
 let currentUser = null;
 let currentFilter = 'pending';
@@ -75,7 +75,7 @@ async function loadPasses() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         allPasses = await res.json();
-        
+
         updateStats();
         displayPasses();
     } catch (err) {
@@ -93,21 +93,21 @@ function updateStats() {
         console.log('No passes data available');
         return;
     }
-    
+
     // Get current date in IST (India Standard Time)
     const now = new Date();
     const istOffset = 5.5 * 60; // IST is UTC+5:30
     const istTime = new Date(now.getTime() + (istOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
     const today = istTime.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
-    
+
     console.log('Current IST date:', today);
     console.log('Total passes:', allPasses.length);
-    
+
     const pending = allPasses.filter(p => p.status === 'pending').length;
-    
+
     // Total approved (all time)
     const totalApproved = allPasses.filter(p => p.status === 'approved' || p.status === 'used').length;
-    
+
     // Approved today only (in IST)
     const approvedToday = allPasses.filter(p => {
         if (p.status !== 'approved' && p.status !== 'used') return false;
@@ -124,15 +124,15 @@ function updateStats() {
         }
         return isToday;
     }).length;
-    
+
     const used = allPasses.filter(p => p.status === 'used').length;
-    
+
     // Update counts
     document.getElementById('pendingCount').textContent = pending;
     document.getElementById('approvedCount').textContent = approvedToday;
     document.getElementById('totalApprovedCount').textContent = totalApproved;
     document.getElementById('usedCount').textContent = used;
-    
+
     console.log('Stats updated (IST):', {
         pending: pending,
         approvedToday: approvedToday,
@@ -145,7 +145,7 @@ function updateStats() {
 // Filter passes
 function filterPasses(status) {
     currentFilter = status;
-    
+
     // Update active button
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -153,7 +153,7 @@ function filterPasses(status) {
             btn.classList.add('active');
         }
     });
-    
+
     displayPasses();
 }
 
@@ -161,12 +161,12 @@ function filterPasses(status) {
 function displayPasses() {
     const container = document.getElementById('passesContainer');
     const filtered = currentFilter ? allPasses.filter(p => p.status === currentFilter) : allPasses;
-    
+
     if (filtered.length === 0) {
         container.innerHTML = '<div class="empty-state">No passes found</div>';
         return;
     }
-    
+
     container.innerHTML = filtered.map(pass => createPassCard(pass)).join('');
 }
 
@@ -176,17 +176,17 @@ function createPassCard(pass) {
     const approvedDate = pass.approved_time ? new Date(pass.approved_time).toLocaleString() : 'N/A';
     const expiryDate = pass.expiry_time ? new Date(pass.expiry_time).toLocaleString() : 'N/A';
     const usedDate = pass.used_time ? new Date(pass.used_time).toLocaleString() : 'N/A';
-    
+
     // Check if it's a daily entry pass
     const isDailyEntry = pass.reason.includes('Daily Entry');
     const passTypeIcon = isDailyEntry ? '🚪' : '🚶';
     const passTypeLabel = isDailyEntry ? '<span style="background:#4facfe;color:white;padding:4px 8px;border-radius:4px;font-size:12px;margin-left:8px;">DAILY ENTRY</span>' : '';
-    
+
     // student info display
     const studentName = pass.student_name || 'Unknown';
     const studentCode = pass.student_code || `ID: ${pass.student_id}`;
     const studentClass = pass.student_class || 'N/A';
-    
+
     return `
         <div class="pass-item" style="${isDailyEntry ? 'border-left: 4px solid #4facfe;' : ''}">
             <div class="pass-header">
@@ -224,15 +224,15 @@ function createPassCard(pass) {
 // Approve pass
 async function approvePass(passId) {
     if (!confirm('Approve this pass request?')) return;
-    
+
     try {
         const res = await fetch(`${API_BASE}/passes/${passId}/approve`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!res.ok) throw new Error('Failed to approve');
-        
+
         // Reload passes to update stats
         await loadPasses();
         alert('Pass approved successfully!');
@@ -244,15 +244,15 @@ async function approvePass(passId) {
 // Reject pass
 async function rejectPass(passId) {
     if (!confirm('Reject this pass request?')) return;
-    
+
     try {
         const res = await fetch(`${API_BASE}/passes/${passId}/reject`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!res.ok) throw new Error('Failed to reject');
-        
+
         // Reload passes to update stats
         await loadPasses();
         alert('Pass rejected');
