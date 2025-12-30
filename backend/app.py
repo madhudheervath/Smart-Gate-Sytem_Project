@@ -87,12 +87,7 @@ def debug_check_password(email: str, password: str, db: Session = Depends(get_db
 # CORS middleware for web frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "https://smart-gate-sytem-project.vercel.app",
-        "https://smart-gate-sytem-project-j3bk.vercel.app"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
