@@ -36,7 +36,9 @@ COPY backend/ .
 COPY frontend/ ../frontend/
 
 # Create a non-root user for security (optional but recommended for Render)
+# Create a non-root user for security (optional but recommended for Render)
 RUN adduser --disabled-password --gecos '' appuser
+RUN chown -R appuser:appuser /app
 USER appuser
 
 # Expose the port
