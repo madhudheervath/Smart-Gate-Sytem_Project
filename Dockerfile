@@ -23,7 +23,11 @@ RUN apt-get update && apt-get install -y \
 # We copy requirements first to leverage Docker cache
 COPY backend/requirements.txt .
 
-# Increase timeout for dlib compilation
+# Increase timeout for dlib compilation & Reduce memory usage
+# Limit compilation to 1 thread to avoid OOM on free tier
+ENV CMAKE_BUILD_PARALLEL_LEVEL=1
+ENV MAX_JOBS=1
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
