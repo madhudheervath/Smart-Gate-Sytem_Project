@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Gate System</title>
+    <link rel="stylesheet" href="common/styles.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 90%;
+            margin: 40px auto;
+            text-align: center;
+        }
+
+        h1 {
+            color: #2d3748;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        p.subtitle {
+            color: #4a5568;
+            font-size: 1.2rem;
+            margin-bottom: 50px;
+        }
+
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 30px;
+            padding: 20px;
+        }
+
+        .portal-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .portal-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
+            border-color: #667eea;
+        }
+
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .portal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .portal-desc {
+            color: #718096;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Card specific colors on hover */
+        .portal-card.student:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
+        .portal-card.guard:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
+        .portal-card.admin:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
+        .portal-card.parent:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            }
+            h1 { color: #fff; }
+            p.subtitle { color: #a0aec0; }
+            .portal-card {
+                background: rgba(30, 30, 50, 0.8);
+                backdrop-filter: blur(10px);
+                border-color: rgba(255,255,255,0.1);
+            }
+            .portal-title { color: #fff; }
+            .portal-desc { color: #cbd5e0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Smart Gate System</h1>
+        <p class="subtitle">Secure Campus Access Management</p>
+
+        <div class="portal-grid">
+            <!-- Student Portal -->
+            <a href="student/index.html" class="portal-card student">
+                <span class="icon">🎓</span>
+                <span class="portal-title">Student Portal</span>
+                <span class="portal-desc">Generate pass QR codes, view history, and manage your profile.</span>
+            </a>
+
+            <!-- Guard Portal -->
+            <a href="guard/index.html" class="portal-card guard">
+                <span class="icon">👮</span>
+                <span class="portal-title">Guard Portal</span>
+                <span class="portal-desc">Scan QR codes, verify identities, and monitor gate entries.</span>
+            </a>
+
+            <!-- Parent Portal -->
+            <a href="parent/index.html" class="portal-card parent">
+                <span class="icon">👪</span>
+                <span class="portal-title">Parent Portal</span>
+                <span class="portal-desc">Receive notifications and track your student's campus activity.</span>
+            </a>
+
+            <!-- Admin Portal -->
+            <a href="admin/index.html" class="portal-card admin">
+                <span class="icon">🛡️</span>
+                <span class="portal-title">Admin Portal</span>
+                <span class="portal-desc">Manage users, approve passes, and view system analytics.</span>
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>
