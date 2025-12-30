@@ -2,17 +2,10 @@
     "builds": [
         {
             "src": "package.json",
-            "use": "@vercel/static-build"
-        }
-    ],
-    "rewrites": [
-        {
-            "source": "/",
-            "destination": "/frontend/index.html"
-        },
-        {
-            "source": "/(.*)",
-            "destination": "/frontend/$1"
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "dist"
+            }
         }
     ]
 }
