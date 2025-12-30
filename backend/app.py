@@ -69,6 +69,21 @@ def list_users(db: Session = Depends(get_db)):
         for u in users
     ]
 
+@app.get("/debug/check_password")
+def debug_check_password(email: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return {"status": "error", "message": "User not found"}
+    
+    is_valid = verify_pwd(password, user.pwd_hash)
+    return {
+        "status": "success" if is_valid else "failed",
+        "email": user.email,
+        "password_provided": password,
+        "is_valid": is_valid,
+        "hash_prefix": user.pwd_hash[:10] if user.pwd_hash else "None"
+    }
+
 # CORS middleware for web frontend
 app.add_middleware(
     CORSMiddleware,
