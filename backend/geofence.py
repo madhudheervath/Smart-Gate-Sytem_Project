@@ -49,6 +49,11 @@ class Geofence:
             self.polygon = Polygon([(lat, lon) for lat, lon in DEFAULT_CAMPUS_POLYGON])
         else:
             # Use configured location settings or defaults
+            pass # Settings loaded dynamically on check
+    
+    def _refresh_settings(self):
+        """Reload settings from file"""
+        if not self.use_polygon:
             self.center, self.radius_km = get_campus_settings()
     
     def is_inside(self, latitude: float, longitude: float) -> bool:
@@ -68,6 +73,7 @@ class Geofence:
             return self.polygon.contains(point)
         else:
             # Check circular boundary
+            self._refresh_settings()
             student_location = (latitude, longitude)
             distance_km = geodesic(self.center, student_location).kilometers
             return distance_km <= self.radius_km
@@ -83,6 +89,7 @@ class Geofence:
         Returns:
             Distance in kilometers
         """
+        self._refresh_settings()
         student_location = (latitude, longitude)
         campus_center = self.center if not self.use_polygon else (
             sum(p[0] for p in DEFAULT_CAMPUS_POLYGON) / len(DEFAULT_CAMPUS_POLYGON),
