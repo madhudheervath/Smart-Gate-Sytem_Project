@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="face-verify-styles.css">
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
+
 <body>
     <!-- Login Page -->
     <div id="loginPage" class="page active">
@@ -49,7 +51,7 @@
                 <!-- Left: Scanner Card -->
                 <div class="card scanner-card">
                     <h2>QR Code Scanner</h2>
-                    
+
                     <div class="scanner-modes">
                         <button class="mode-btn active" onclick="switchMode('camera')" id="cameraBtn">
                             📷 Camera
@@ -144,7 +146,8 @@
     </div>
 
     <script src="face-verify-sequential.js"></script>
+    <script src="../common/config.js"></script>
     <script src="app.js?v=2025-entry-exit"></script>
 </body>
-</html>
 
+</html>

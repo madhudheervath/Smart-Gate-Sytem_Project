@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,37 +15,45 @@
             padding: 20px;
             margin: 0;
         }
+
         .container {
             max-width: 600px;
             margin: 0 auto;
         }
+
         .header {
             text-align: center;
             color: white;
             margin-bottom: 30px;
         }
+
         .step {
             display: none;
         }
+
         .step.active {
             display: block;
         }
+
         .card {
             background: white;
             border-radius: 15px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             margin-bottom: 20px;
         }
+
         .form-group {
             margin-bottom: 20px;
         }
+
         .form-group label {
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
             color: #555;
         }
+
         .form-group input {
             width: 100%;
             padding: 12px 15px;
@@ -53,6 +62,7 @@
             font-size: 16px;
             box-sizing: border-box;
         }
+
         .btn {
             padding: 12px 24px;
             border: none;
@@ -63,15 +73,18 @@
             margin-right: 10px;
             margin-bottom: 10px;
         }
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
+
         .btn-secondary {
             background: #f8f9fa;
             color: #6c757d;
             border: 2px solid #e9ecef;
         }
+
         .history-item {
             padding: 12px;
             margin-bottom: 10px;
@@ -79,34 +92,41 @@
             border-left: 4px solid #667eea;
             background: #f8f9fa;
         }
+
         .history-item.entry {
             border-left-color: #28a745;
             background: #f0f8f4;
         }
+
         .history-item.exit {
             border-left-color: #dc3545;
             background: #fef5f5;
         }
+
         .history-item-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 5px;
         }
+
         .history-item-type {
             font-weight: 600;
             font-size: 14px;
         }
+
         .history-item-time {
             font-size: 12px;
             color: #666;
         }
+
         .history-item-details {
             font-size: 13px;
             color: #555;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -195,12 +215,14 @@
             <div class="card success-card">
                 <div class="success-icon">🎉</div>
                 <h3>All Set!</h3>
-                <p>You will now receive notifications when <strong id="successStudentName"></strong> enters or exits the campus.</p>
-                
+                <p>You will now receive notifications when <strong id="successStudentName"></strong> enters or exits the
+                    campus.</p>
+
                 <!-- Last Status Display -->
                 <div class="last-status-section" style="margin-top: 20px;">
                     <h4 style="text-align: center; margin-bottom: 15px;">📊 Current Status</h4>
-                    <div id="lastStatusContainer" style="padding: 15px; background: #f8f9fa; border-radius: 10px; text-align: center;">
+                    <div id="lastStatusContainer"
+                        style="padding: 15px; background: #f8f9fa; border-radius: 10px; text-align: center;">
                         <div id="lastStatusLoading" style="color: #666;">
                             Loading status...
                         </div>
@@ -242,7 +264,7 @@
                 <div class="error-icon">❌</div>
                 <h3>Setup Failed</h3>
                 <p id="errorMessage">Something went wrong during setup.</p>
-                
+
                 <div class="troubleshooting">
                     <h4>🔧 Troubleshooting:</h4>
                     <ul>
@@ -260,6 +282,8 @@
         </div>
     </div>
 
+    <script src="../common/config.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>
