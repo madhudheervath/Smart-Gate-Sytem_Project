@@ -417,10 +417,12 @@ async def verify(
     
     print(f"DEBUG: Face image received: {face_image is not None}")
     print(f"DEBUG: Face auth enabled: {FACE_AUTH_ENABLED}")
-    print(f"DEBUG: Student: {student.name if student else 'None'}")
+    print(f"DEBUG: Student from pass: {student.name if student else 'None'} (ID: {student.student_id if student else 'None'})")
+    print(f"DEBUG: Pass belongs to student_id: {pr.student_id}")
     
     if FACE_AUTH_ENABLED and face_image and student:
         try:
+            print(f"DEBUG: Verifying face for: {student.name} ({student.student_id})")
             print(f"DEBUG: Student face registered: {student.face_registered}")
             # Check if student has registered face
             if student.face_registered and student.face_encoding:
@@ -439,13 +441,17 @@ async def verify(
                     print(f"DEBUG: Face encoding extracted: {check_encoding is not None}")
                     
                     if check_encoding is not None:
-                        # Get stored encoding
+                        # Get stored encoding for THIS specific student
                         stored_encoding = face_auth.json_to_encoding(student.face_encoding)
+                        print(f"DEBUG: Comparing captured face with {student.name}'s registered face")
                         
-                        # Compare faces
-                        print("DEBUG: Comparing faces...")
-                        is_match, distance = face_auth.compare_faces(stored_encoding, check_encoding, tolerance=0.6)
-                        print(f"DEBUG: Face match result: {is_match}, distance: {distance}")
+                        # Compare faces with stricter tolerance (0.5 instead of 0.6)
+                        is_match, distance = face_auth.compare_faces(stored_encoding, check_encoding, tolerance=0.5)
+                        print(f"DEBUG: Face comparison result:")
+                        print(f"       - Student: {student.name} ({student.student_id})")
+                        print(f"       - Match: {is_match}")
+                        print(f"       - Distance: {distance:.4f}")
+                        print(f"       - Tolerance: 0.5")
                         
                         # Get confidence
                         confidence_info = face_auth.get_confidence_level(distance)
@@ -454,19 +460,28 @@ async def verify(
                         face_verified = bool(is_match)
                         face_confidence = int(confidence_info["confidence_percent"])
                         face_distance = float(distance)
-                        face_message = confidence_info["description"] if is_match else "Face does not match registered photo"
                         
-                        print(f"DEBUG: Face verification complete - Match: {is_match}, Confidence: {face_confidence}%")
+                        if is_match:
+                            face_message = f"Face matches {student.name} - {confidence_info['description']}"
+                        else:
+                            face_message = f"Face does NOT match {student.name} (distance: {distance:.3f})"
+                        
+                        print(f"DEBUG: Final result - Match: {is_match}, Confidence: {face_confidence}%, Message: {face_message}")
                     else:
                         face_verified = False
-                        face_message = "No face detected in image"
+                        face_message = "No face detected in captured image"
+                        print("DEBUG: No face detected in captured image")
                 else:
                     face_verified = False
                     face_message = error_msg
+                    print(f"DEBUG: Image validation failed: {error_msg}")
             else:
-                face_message = "Student has not registered face"
+                face_message = f"{student.name} has not registered face"
+                print(f"DEBUG: {face_message}")
         except Exception as e:
             print(f"Face verification error: {e}")
+            import traceback
+            traceback.print_exc()
             face_message = f"Face verification error: {str(e)}"
     
     response = {

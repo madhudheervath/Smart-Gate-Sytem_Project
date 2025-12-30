@@ -197,41 +197,25 @@
                 <h3>All Set!</h3>
                 <p>You will now receive notifications when <strong id="successStudentName"></strong> enters or exits the campus.</p>
                 
-                <div class="notification-preview">
-                    <h4>📱 You'll receive notifications like this:</h4>
-                    
-                    <!-- Entry Notification Example -->
-                    <div style="text-align: left; margin-bottom: 10px;">
-                        <small style="font-weight: 600; color: #28a745;">When student ENTERS campus:</small>
-                    </div>
-                    <div class="notification-example" style="margin-bottom: 20px;">
-                        <div class="notification-header" style="background: #28a745;">
-                            🟢 Campus GatePass
+                <!-- Last Status Display -->
+                <div class="last-status-section" style="margin-top: 20px;">
+                    <h4 style="text-align: center; margin-bottom: 15px;">📊 Current Status</h4>
+                    <div id="lastStatusContainer" style="padding: 15px; background: #f8f9fa; border-radius: 10px; text-align: center;">
+                        <div id="lastStatusLoading" style="color: #666;">
+                            Loading status...
                         </div>
-                        <div class="notification-body">
-                            <strong id="exampleStudentNameEntry">John Doe</strong> Entered Campus<br>
-                            <span id="exampleStudentDetailEntry">John Doe (U22CN362) entered campus at 3:45 PM</span>
+                        <div id="lastStatusDisplay" style="display: none;">
+                            <!-- Last status will be displayed here -->
                         </div>
-                    </div>
-                    
-                    <!-- Exit Notification Example -->
-                    <div style="text-align: left; margin-bottom: 10px;">
-                        <small style="font-weight: 600; color: #dc3545;">When student EXITS campus:</small>
-                    </div>
-                    <div class="notification-example">
-                        <div class="notification-header" style="background: #dc3545;">
-                            🔴 Campus GatePass
-                        </div>
-                        <div class="notification-body">
-                            <strong id="exampleStudentNameExit">John Doe</strong> Exited Campus<br>
-                            <span id="exampleStudentDetailExit">John Doe (U22CN362) exited campus at 6:30 PM</span>
+                        <div id="lastStatusEmpty" style="display: none; color: #666;">
+                            No entry/exit records yet
                         </div>
                     </div>
                 </div>
 
                 <!-- Student Entry/Exit History -->
                 <div id="studentHistory" style="margin-top: 30px; text-align: left; display: none;">
-                    <h4 style="text-align: center; margin-bottom: 15px;">📊 Recent Activity</h4>
+                    <h4 style="text-align: center; margin-bottom: 15px;">📜 Activity History</h4>
                     <div id="historyList" style="max-height: 300px; overflow-y: auto;">
                         <!-- History items will be loaded here -->
                     </div>

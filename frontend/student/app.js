@@ -207,6 +207,16 @@ function logout() {
     localStorage.removeItem('token');
     token = null;
     currentUser = null;
+    
+    // Clear contact form fields to prevent data persistence
+    document.getElementById('studentPhone').value = '';
+    document.getElementById('parentName').value = '';
+    document.getElementById('parentPhone').value = '';
+    
+    // Clear login form
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+    
     showPage('loginPage');
 }
 
@@ -644,6 +654,27 @@ function sendTestNotification(message) {
 function initializeNotificationCard() {
     if (currentUser) {
         document.getElementById('notificationCard').style.display = 'block';
+        
+        // Clear all fields first to prevent old data from showing
+        document.getElementById('studentPhone').value = '';
+        document.getElementById('parentName').value = '';
+        document.getElementById('parentPhone').value = '';
+        
+        // Pre-fill contact form with CURRENT user's data ONLY if they exist
+        if (currentUser.phone) {
+            document.getElementById('studentPhone').value = currentUser.phone;
+        }
+        if (currentUser.parent_name) {
+            document.getElementById('parentName').value = currentUser.parent_name;
+        }
+        if (currentUser.parent_phone) {
+            document.getElementById('parentPhone').value = currentUser.parent_phone;
+        }
+        
+        console.log('Contact form initialized for:', currentUser.name);
+        console.log('Phone:', currentUser.phone || 'Not set');
+        console.log('Parent Name:', currentUser.parent_name || 'Not set');
+        console.log('Parent Phone:', currentUser.parent_phone || 'Not set');
         
         // Check if notifications are already enabled
         if (Notification.permission === 'granted') {

@@ -159,6 +159,9 @@ async function verifyTokenWithFace(token_str) {
                     faceInfo = `
                         <div class="result-face-info verified">
                             <div>✅ <strong>Face Match Verified</strong></div>
+                            <div style="font-size:13px; margin-top:5px;">
+                                Verified as: <strong>${data.student_name}</strong>
+                            </div>
                             <span class="face-match-badge ${confidenceClass}">
                                 ${confidence.toFixed(1)}% Confidence
                             </span>
@@ -172,8 +175,11 @@ async function verifyTokenWithFace(token_str) {
                     faceInfo = `
                         <div class="result-face-info not-verified">
                             <div>⚠️ <strong>Face Not Verified</strong></div>
-                            <div style="font-size:12px; margin-top:4px;">
+                            <div style="font-size:12px; margin-top:4px; color:#d32f2f;">
                                 ${data.face_message || 'Face does not match registered photo'}
+                            </div>
+                            <div style="font-size:11px; margin-top:5px; opacity:0.8;">
+                                Pass holder: <strong>${data.student_name}</strong>
                             </div>
                         </div>
                     `;

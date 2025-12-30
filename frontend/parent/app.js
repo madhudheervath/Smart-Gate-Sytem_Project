@@ -202,36 +202,76 @@ function showSuccessPage() {
     // Update the success message
     document.getElementById('successStudentName').textContent = currentStudent.name;
     
-    // Get current time for entry example
-    const currentTime = new Date().toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-    });
-    
-    // Calculate exit time (3 hours later as example)
-    const exitTime = new Date();
-    exitTime.setHours(exitTime.getHours() + 3);
-    const exitTimeString = exitTime.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-    });
-    
-    // Update ENTRY notification example
-    document.getElementById('exampleStudentNameEntry').textContent = currentStudent.name;
-    document.getElementById('exampleStudentDetailEntry').textContent = 
-        `${currentStudent.name} (${currentStudent.id}) entered campus at ${currentTime}`;
-    
-    // Update EXIT notification example
-    document.getElementById('exampleStudentNameExit').textContent = currentStudent.name;
-    document.getElementById('exampleStudentDetailExit').textContent = 
-        `${currentStudent.name} (${currentStudent.id}) exited campus at ${exitTimeString}`;
-    
     showStep('success');
     
-    // Load student entry/exit history
+    // Load both last status and full history
+    loadLastStatus();
     loadStudentHistory();
+}
+
+// Load only the last status (most recent entry/exit)
+async function loadLastStatus() {
+    try {
+        document.getElementById('lastStatusLoading').style.display = 'block';
+        document.getElementById('lastStatusDisplay').style.display = 'none';
+        document.getElementById('lastStatusEmpty').style.display = 'none';
+        
+        const response = await fetch(`${API_BASE}/api/parent/student_history/${currentStudent.id}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load status');
+        }
+        
+        const data = await response.json();
+        
+        document.getElementById('lastStatusLoading').style.display = 'none';
+        
+        if (data.history && data.history.length > 0) {
+            // Get only the first (most recent) item
+            const lastStatus = data.history[0];
+            displayLastStatus(lastStatus);
+        } else {
+            document.getElementById('lastStatusEmpty').style.display = 'block';
+        }
+        
+    } catch (error) {
+        console.error('Error loading last status:', error);
+        document.getElementById('lastStatusLoading').style.display = 'none';
+        document.getElementById('lastStatusEmpty').textContent = 'Failed to load status';
+        document.getElementById('lastStatusEmpty').style.display = 'block';
+    }
+}
+
+// Display last status
+function displayLastStatus(status) {
+    const displayDiv = document.getElementById('lastStatusDisplay');
+    displayDiv.style.display = 'block';
+    
+    const icon = status.scan_type === 'entry' ? '🟢' : '🔴';
+    const typeText = status.scan_type === 'entry' ? 'ENTERED Campus' : 'EXITED Campus';
+    const bgColor = status.scan_type === 'entry' ? '#28a745' : '#dc3545';
+    const bgLight = status.scan_type === 'entry' ? '#d4edda' : '#f8d7da';
+    
+    displayDiv.innerHTML = `
+        <div style="background: ${bgLight}; border: 2px solid ${bgColor}; border-radius: 10px; padding: 20px; text-align: left;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <div style="font-size: 24px;">${icon}</div>
+                <div style="font-size: 12px; color: #666;">${status.date}</div>
+            </div>
+            <div style="font-size: 18px; font-weight: bold; color: ${bgColor}; margin-bottom: 5px;">
+                ${typeText}
+            </div>
+            <div style="font-size: 16px; color: #333; margin-bottom: 8px;">
+                <strong>${currentStudent.name}</strong> (${currentStudent.id})
+            </div>
+            <div style="font-size: 14px; color: #666;">
+                📍 ${status.location || 'Main Gate'}
+            </div>
+            <div style="font-size: 14px; color: #666;">
+                🕒 ${status.time}
+            </div>
+        </div>
+    `;
 }
 
 // Load student entry/exit history

@@ -22,6 +22,12 @@ class UserOut(BaseModel):
     valid_until: Optional[datetime] = None
     face_registered: bool = False
     face_registered_at: Optional[datetime] = None
+    # Contact information for notifications
+    phone: Optional[str] = None
+    parent_name: Optional[str] = None
+    parent_phone: Optional[str] = None
+    fcm_token: Optional[str] = None
+    parent_fcm_token: Optional[str] = None
     class Config:
         from_attributes = True
 
