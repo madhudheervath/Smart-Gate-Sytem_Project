@@ -1,0 +1,9 @@
+backend/
+*.py
+*.sh
+Dockerfile
+venv/
+.env*
+__pycache__/
+*.sqlite
+*.db
