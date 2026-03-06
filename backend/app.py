@@ -27,19 +27,17 @@ from crud import log_scan, mark_used
 from fastapi.security import OAuth2PasswordRequestForm
 import hmac
 import hashlib
+import importlib
 import os
 
 # Optional imports - disable if not installed or explicitly turned off via env
-if settings.FACE_AUTH_ENABLED:
-    try:
-        import face_auth
-        FACE_AUTH_ENABLED = True
-    except ImportError:
-        FACE_AUTH_ENABLED = False
-        print("⚠️  Face authentication disabled - install face-recognition to enable")
-        print("    Run: pip install face-recognition")
+FACE_AUTH_ENABLED = settings.FACE_AUTH_ENABLED
+_face_auth_module = None
+_face_auth_import_error = None
+
+if FACE_AUTH_ENABLED:
+    print("✅ Face authentication enabled by configuration; face stack will load on demand")
 else:
-    FACE_AUTH_ENABLED = False
     print("⚠️  Face authentication disabled by configuration")
 
 if settings.NOTIFICATIONS_ENABLED:
@@ -74,6 +72,28 @@ if settings.GEOFENCE_ENABLED:
 else:
     GEOFENCE_ENABLED = False
     print("⚠️  GPS geofencing disabled by configuration")
+
+
+def get_face_auth_module():
+    global _face_auth_module, _face_auth_import_error
+
+    if not FACE_AUTH_ENABLED:
+        return None
+
+    if _face_auth_module is not None:
+        return _face_auth_module
+
+    if _face_auth_import_error is not None:
+        return None
+
+    try:
+        _face_auth_module = importlib.import_module("face_auth")
+        print("✅ Face authentication module loaded successfully")
+        return _face_auth_module
+    except Exception as e:
+        _face_auth_import_error = str(e)
+        print(f"⚠️  Face authentication unavailable: {e}")
+        return None
 
 # IST timezone (UTC+5:30)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -778,6 +798,10 @@ async def verify(
     
     if FACE_AUTH_ENABLED and face_image and student:
         try:
+            face_auth_module = get_face_auth_module()
+            if face_auth_module is None:
+                return _fail(db, pid, uid, guard.id, "invalid", "face-service-unavailable")
+
             print(f"DEBUG: Verifying face for: {student.name} ({student.student_id})")
             print(f"DEBUG: Student face registered: {student.face_registered}")
             # Check if student has registered face
@@ -788,21 +812,21 @@ async def verify(
                 print(f"DEBUG: Face image size: {len(image_bytes)} bytes")
                 
                 # Validate image
-                is_valid, error_msg = face_auth.validate_image(image_bytes)
+                is_valid, error_msg = face_auth_module.validate_image(image_bytes)
                 print(f"DEBUG: Image validation: {is_valid}, {error_msg}")
                 if is_valid:
                     print("DEBUG: Extracting face encoding from captured image...")
                     # Extract face encoding from uploaded image
-                    check_encoding = face_auth.extract_face_encoding(image_bytes)
+                    check_encoding = face_auth_module.extract_face_encoding(image_bytes)
                     print(f"DEBUG: Face encoding extracted: {check_encoding is not None}")
                     
                     if check_encoding is not None:
                         # Get stored encoding for THIS specific student
-                        stored_encoding = face_auth.json_to_encoding(student.face_encoding)
+                        stored_encoding = face_auth_module.json_to_encoding(student.face_encoding)
                         print(f"DEBUG: Comparing captured face with {student.name}'s registered face")
                         
                         # Compare faces with stricter tolerance (0.5 instead of 0.6)
-                        is_match, distance = face_auth.compare_faces(stored_encoding, check_encoding, tolerance=0.5)
+                        is_match, distance = face_auth_module.compare_faces(stored_encoding, check_encoding, tolerance=0.5)
                         print(f"DEBUG: Face comparison result:")
                         print(f"       - Student: {student.name} ({student.student_id})")
                         print(f"       - Match: {is_match}")
@@ -810,7 +834,7 @@ async def verify(
                         print(f"       - Tolerance: 0.5")
                         
                         # Get confidence
-                        confidence_info = face_auth.get_confidence_level(distance)
+                        confidence_info = face_auth_module.get_confidence_level(distance)
                         
                         # Convert numpy types to Python native types for JSON serialization
                         face_verified = bool(is_match)
@@ -1103,28 +1127,39 @@ if FACE_AUTH_ENABLED:
         Register a student's face for authentication.
         Students can register their own face, admins can register any student's face.
         """
+        face_auth_module = get_face_auth_module()
+        if face_auth_module is None:
+            message = "Face registration is not available on this deployment."
+            if _face_auth_import_error:
+                message = f"{message} Import error: {_face_auth_import_error}"
+            raise HTTPException(status_code=503, detail=message)
+
         # Read image bytes
         image_bytes = await file.read()
+        print(f"📷 Face registration attempt by {user.email} with file {file.filename!r} ({len(image_bytes)} bytes)")
         
         # Validate image
-        is_valid, error_msg = face_auth.validate_image(image_bytes)
+        is_valid, error_msg = face_auth_module.validate_image(image_bytes)
         if not is_valid:
+            print(f"❌ Face registration validation failed for {user.email}: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
         
         # Extract face encoding
-        encoding = face_auth.extract_face_encoding(image_bytes)
+        encoding = face_auth_module.extract_face_encoding(image_bytes)
         if encoding is None:
+            print(f"❌ No face detected for {user.email}")
             raise HTTPException(
                 status_code=400,
-                detail="No face detected in image. Please upload a clear photo with your face visible."
+                detail="No clear face detected. Use a bright, upright photo with only one face visible and try again."
             )
         
         # Store encoding
-        user.face_encoding = face_auth.encoding_to_json(encoding)
+        user.face_encoding = face_auth_module.encoding_to_json(encoding)
         user.face_registered = True
         user.face_registered_at = now_ist()
         db.commit()
         db.refresh(user)
+        print(f"✅ Face registered successfully for {user.email}")
         
         return FaceRegistrationResponse(
             status="success",
@@ -1144,6 +1179,13 @@ if FACE_AUTH_ENABLED:
         Verify a face against stored encoding.
         Used by guards at gate or by admins for testing.
         """
+        face_auth_module = get_face_auth_module()
+        if face_auth_module is None:
+            message = "Face verification is not available on this deployment."
+            if _face_auth_import_error:
+                message = f"{message} Import error: {_face_auth_import_error}"
+            raise HTTPException(status_code=503, detail=message)
+
         # Get student to verify
         student = db.get(User, student_id)
         if not student:
@@ -1159,12 +1201,12 @@ if FACE_AUTH_ENABLED:
         image_bytes = await file.read()
         
         # Validate image
-        is_valid, error_msg = face_auth.validate_image(image_bytes)
+        is_valid, error_msg = face_auth_module.validate_image(image_bytes)
         if not is_valid:
             raise HTTPException(status_code=400, detail=error_msg)
         
         # Extract face encoding from uploaded image
-        check_encoding = face_auth.extract_face_encoding(image_bytes)
+        check_encoding = face_auth_module.extract_face_encoding(image_bytes)
         if check_encoding is None:
             return FaceVerificationResponse(
                 verified=False,
@@ -1175,13 +1217,13 @@ if FACE_AUTH_ENABLED:
             )
         
         # Get stored encoding
-        stored_encoding = face_auth.json_to_encoding(student.face_encoding)
+        stored_encoding = face_auth_module.json_to_encoding(student.face_encoding)
         
         # Compare faces
-        is_match, distance = face_auth.compare_faces(stored_encoding, check_encoding, tolerance=0.6)
+        is_match, distance = face_auth_module.compare_faces(stored_encoding, check_encoding, tolerance=0.6)
         
         # Get confidence level
-        confidence_info = face_auth.get_confidence_level(distance)
+        confidence_info = face_auth_module.get_confidence_level(distance)
         
         return FaceVerificationResponse(
             verified=is_match,

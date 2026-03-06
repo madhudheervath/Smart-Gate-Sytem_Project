@@ -335,8 +335,15 @@ const FaceAPI = {
         const response = await API.postForm('/api/register_face', formData);
 
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || 'Failed to register face');
+            let errorMsg = 'Failed to register face';
+            try {
+                const errorData = await response.clone().json();
+                errorMsg = errorData.detail || errorData.message || errorMsg;
+            } catch {
+                const error = await response.text();
+                errorMsg = error || errorMsg;
+            }
+            throw new Error(errorMsg);
         }
 
         return await response.json();
@@ -360,8 +367,15 @@ const FaceAPI = {
         const response = await API.postForm('/api/verify_face', formData);
 
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(error || 'Verification failed');
+            let errorMsg = 'Verification failed';
+            try {
+                const errorData = await response.clone().json();
+                errorMsg = errorData.detail || errorData.message || errorMsg;
+            } catch {
+                const error = await response.text();
+                errorMsg = error || errorMsg;
+            }
+            throw new Error(errorMsg);
         }
 
         return await response.json();

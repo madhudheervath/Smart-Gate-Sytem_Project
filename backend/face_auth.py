@@ -4,7 +4,7 @@ Handles face registration and verification for gate pass system
 """
 import face_recognition
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 import io
 import json
 from typing import Optional, Tuple
@@ -17,6 +17,28 @@ def now_ist():
     """Get current time in IST timezone"""
     return datetime.now(IST)
 
+
+MAX_FACE_IMAGE_DIMENSION = 1280
+
+
+def _load_normalized_image(image_bytes: bytes) -> Tuple[Image.Image, Optional[str]]:
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        detected_format = image.format.upper() if image.format else None
+        image = ImageOps.exif_transpose(image)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        return image, detected_format
+    except Exception as e:
+        raise ValueError(f"Invalid image file: {str(e)}") from e
+
+
+def _resize_for_face_processing(image: Image.Image, max_dimension: int = MAX_FACE_IMAGE_DIMENSION) -> Image.Image:
+    processed = image.copy()
+    if max(processed.size) > max_dimension:
+        processed.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+    return processed
+
 def extract_face_encoding(image_bytes: bytes) -> Optional[list]:
     """
     Extract 128-D face encoding from image bytes
@@ -28,18 +50,27 @@ def extract_face_encoding(image_bytes: bytes) -> Optional[list]:
         List of 128 floats representing face encoding, or None if no face detected
     """
     try:
-        # Load image from bytes
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
+        # Normalize orientation and shrink large mobile images to reduce memory usage.
+        image, _ = _load_normalized_image(image_bytes)
+        image = _resize_for_face_processing(image)
+
         # Convert PIL Image to numpy array
         img_array = np.array(image)
-        
-        # Detect faces and get encodings
-        face_locations = face_recognition.face_locations(img_array)
+
+        # Use HOG on CPU and start without upsampling to keep memory usage predictable.
+        face_locations = face_recognition.face_locations(
+            img_array,
+            number_of_times_to_upsample=0,
+            model="hog",
+        )
+
+        if len(face_locations) == 0:
+            # Retry once with light upsampling for smaller or softer images.
+            face_locations = face_recognition.face_locations(
+                img_array,
+                number_of_times_to_upsample=1,
+                model="hog",
+            )
         
         if len(face_locations) == 0:
             return None  # No face detected
@@ -118,24 +149,24 @@ def validate_image(image_bytes: bytes, max_size_mb: int = 5) -> Tuple[bool, Opti
     
     # Check if valid image
     try:
-        image = Image.open(io.BytesIO(image_bytes))
-        
+        image, detected_format = _load_normalized_image(image_bytes)
+
         # Check format
-        if image.format not in ['JPEG', 'PNG', 'JPG']:
-            return False, f"Invalid image format: {image.format}. Only JPEG/PNG allowed."
+        if detected_format and detected_format not in ['JPEG', 'JPG', 'PNG', 'WEBP']:
+            return False, f"Invalid image format: {detected_format}. Only JPEG, PNG, or WEBP allowed."
         
         # Check dimensions
         width, height = image.size
         if width < 200 or height < 200:
             return False, f"Image too small ({width}x{height}). Minimum 200x200 required."
         
-        if width > 4000 or height > 4000:
-            return False, f"Image too large ({width}x{height}). Maximum 4000x4000 allowed."
+        if width > 6000 or height > 6000:
+            return False, f"Image too large ({width}x{height}). Maximum 6000x6000 allowed."
         
         return True, None
         
-    except Exception as e:
-        return False, f"Invalid image file: {str(e)}"
+    except ValueError as e:
+        return False, str(e)
 
 # Face matching confidence levels
 CONFIDENCE_LEVELS = {

@@ -211,6 +211,67 @@ function getCurrentLocation() {
 
 // === FACE AUTHENTICATION FUNCTIONS ===
 let selectedFaceFile = null;
+let selectedFacePreviewUrl = null;
+
+function revokeSelectedFacePreview() {
+    if (selectedFacePreviewUrl) {
+        URL.revokeObjectURL(selectedFacePreviewUrl);
+        selectedFacePreviewUrl = null;
+    }
+}
+
+async function optimizeFaceImage(file) {
+    if (!file) {
+        throw new Error('Please choose an image file');
+    }
+
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (file.type && !supportedTypes.includes(file.type)) {
+        throw new Error('Please choose a JPEG, PNG, or WEBP image');
+    }
+
+    const sourceUrl = URL.createObjectURL(file);
+    try {
+        const image = await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('Unable to read the selected image'));
+            img.src = sourceUrl;
+        });
+
+        const maxDimension = 1280;
+        const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+            throw new Error('Image processing is not supported in this browser');
+        }
+
+        context.drawImage(image, 0, 0, width, height);
+
+        const blob = await new Promise((resolve, reject) => {
+            canvas.toBlob(
+                (result) => result ? resolve(result) : reject(new Error('Failed to prepare the image')),
+                'image/jpeg',
+                0.88
+            );
+        });
+
+        const optimizedFile = new File([blob], `face-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        return {
+            file: optimizedFile,
+            previewUrl: URL.createObjectURL(blob)
+        };
+    } finally {
+        URL.revokeObjectURL(sourceUrl);
+    }
+}
 
 async function loadFaceStatus() {
     try {
@@ -246,17 +307,23 @@ async function loadFaceStatus() {
     }
 }
 
-function handleFaceImage(input) {
-    if (input.files && input.files[0]) {
-        selectedFaceFile = input.files[0];
-        const reader = new FileReader();
+async function handleFaceImage(input) {
+    if (!(input.files && input.files[0])) {
+        return;
+    }
 
-        reader.onload = function (e) {
-            document.getElementById('previewImg').src = e.target.result;
-            document.getElementById('imagePreview').style.display = 'block';
-        };
-
-        reader.readAsDataURL(input.files[0]);
+    try {
+        const optimized = await optimizeFaceImage(input.files[0]);
+        revokeSelectedFacePreview();
+        selectedFaceFile = optimized.file;
+        selectedFacePreviewUrl = optimized.previewUrl;
+        document.getElementById('previewImg').src = selectedFacePreviewUrl;
+        document.getElementById('imagePreview').style.display = 'block';
+    } catch (err) {
+        selectedFaceFile = null;
+        revokeSelectedFacePreview();
+        input.value = '';
+        alert('❌ ' + (err.message || 'Failed to prepare the selected image'));
     }
 }
 
@@ -274,6 +341,7 @@ async function uploadFace() {
         document.getElementById('faceImage').value = '';
         document.getElementById('imagePreview').style.display = 'none';
         selectedFaceFile = null;
+        revokeSelectedFacePreview();
 
         loadFaceStatus();
 
