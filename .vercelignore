@@ -1,9 +1,11 @@
-backend/
-*.py
-*.sh
-Dockerfile
 venv/
+backend/.venv/
 .env*
 __pycache__/
+Dockerfile
+*.sh
+gatepass.db
 *.sqlite
-*.db
+*.db-shm
+*.db-wal
+*.log

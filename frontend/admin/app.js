@@ -48,6 +48,13 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
+    const submitButton = e.target.querySelector('button[type="submit"]');
+    errorDiv.textContent = '';
+
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Signing In...';
+    }
 
     try {
         const formData = new URLSearchParams();
@@ -91,6 +98,11 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
         await Promise.all([loadPasses(), loadRegistrationRequests({ notify: false })]);
     } catch (err) {
         errorDiv.textContent = err.message || 'Login failed';
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Login';
+        }
     }
 });
 

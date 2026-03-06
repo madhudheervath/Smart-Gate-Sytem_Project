@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -12,7 +12,10 @@ class Settings(BaseSettings):
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 12
     PARENT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
-    DB_URL: str = DEFAULT_DB_URL
+    DB_URL: str = Field(
+        default=DEFAULT_DB_URL,
+        validation_alias=AliasChoices("DB_URL", "DATABASE_URL", "POSTGRES_URL"),
+    )
     QR_TTL_MINUTES: int = 15
     SELF_REGISTRATION_ENABLED: bool = False
     ACCOUNT_REQUESTS_ENABLED: bool = True

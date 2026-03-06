@@ -2,12 +2,16 @@ function isLocalhostHost(hostname) {
     return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
+const REMOTE_API_BASE = 'https://smart-gate-sytem-project.onrender.com';
+const RETRYABLE_STATUS_CODES = new Set([404, 405, 501, 502, 503, 504]);
+const DEFAULT_API_TIMEOUT_MS = 15000;
+
 function getApiCandidates() {
     const host = window.location.hostname;
     if (!isLocalhostHost(host)) {
         return [
-            'https://smart-gate-sytem-project.onrender.com',
-            window.location.origin
+            window.location.origin,
+            REMOTE_API_BASE
         ].filter(Boolean).filter((value, index, array) => array.indexOf(value) === index);
     }
 
@@ -44,14 +48,23 @@ function createApiClient() {
 
         async fetch(path, options = {}) {
             const candidates = [activeBase, ...getApiCandidates()].filter(Boolean);
+            const uniqueCandidates = [...new Set(candidates)];
             let lastResponse = null;
             let lastError = null;
-            const isLocalhost = isLocalhostHost(window.location.hostname);
 
-            for (const base of [...new Set(candidates)]) {
+            for (const [index, base] of uniqueCandidates.entries()) {
+                const controller = options.signal ? null : new AbortController();
+                const timeoutId = controller
+                    ? window.setTimeout(() => controller.abort(), DEFAULT_API_TIMEOUT_MS)
+                    : null;
+
                 try {
-                    const response = await fetch(`${base}${path}`, options);
-                    if (isLocalhost && (response.status === 404 || response.status === 405 || response.status === 501)) {
+                    const response = await fetch(`${base}${path}`, {
+                        ...options,
+                        signal: controller ? controller.signal : options.signal
+                    });
+                    const hasNextCandidate = index < uniqueCandidates.length - 1;
+                    if (hasNextCandidate && RETRYABLE_STATUS_CODES.has(response.status)) {
                         lastResponse = response;
                         continue;
                     }
@@ -59,7 +72,14 @@ function createApiClient() {
                     activeBase = base;
                     return response;
                 } catch (error) {
-                    lastError = error;
+                    const isAbortError = error?.name === 'AbortError';
+                    lastError = isAbortError
+                        ? new Error(`Request timed out while contacting ${new URL(base).hostname}`)
+                        : error;
+                } finally {
+                    if (timeoutId) {
+                        window.clearTimeout(timeoutId);
+                    }
                 }
             }
 
