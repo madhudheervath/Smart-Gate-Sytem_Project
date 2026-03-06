@@ -16,12 +16,12 @@ class User(Base):
     name = Column(String(120), nullable=False)
     email = Column(String(120), unique=True, index=True)
     pwd_hash = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False)  # 'student'|'admin'|'guard'
+    role = Column(String(20), nullable=False)  # internal access roles: 'student'|'admin'|'guard'
     active = Column(Boolean, default=True)
     
-    # Additional student fields
-    student_id = Column(String(50), unique=True, nullable=True, index=True)  # e.g., U22CN361
-    student_class = Column(String(100), nullable=True)  # e.g., CSE 4 Year
+    # Additional authorized-personnel fields
+    student_id = Column(String(50), unique=True, nullable=True, index=True)  # personnel / roll ID
+    student_class = Column(String(100), nullable=True)  # department / class / team
     guardian_name = Column(String(120), nullable=True)
     valid_until = Column(DateTime, nullable=True)  # Student validity period
     
@@ -38,6 +38,26 @@ class User(Base):
     parent_fcm_token = Column(Text, nullable=True)  # Parent FCM token if they have app
     notification_preferences = Column(Text, default='{}')  # JSON preferences
     last_notification_at = Column(DateTime, nullable=True)  # Last notification timestamp
+
+
+class RegistrationRequest(Base):
+    __tablename__ = "registration_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    email = Column(String(120), nullable=False, index=True)
+    pwd_hash = Column(String(255), nullable=False)
+    requested_role = Column(String(20), nullable=False, default="personnel")
+    student_id = Column(String(50), nullable=True, index=True)
+    student_class = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=True)
+    request_reason = Column(Text, nullable=True)
+    status = Column(String(16), nullable=False, default="pending")  # pending|approved|rejected
+    created_at = Column(DateTime, default=now_ist, nullable=False)
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    review_notes = Column(Text, nullable=True)
+    created_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
 
 class PassRequest(Base):
     __tablename__ = "passes"
@@ -69,5 +89,5 @@ class ScanLog(Base):
     scan_time = Column(DateTime, default=now_ist)
     result = Column(String(32))   # success | expired | invalid | replay | not-approved
     pass_type = Column(String(10), default="entry")  # entry|exit
+    emergency = Column(Boolean, default=False)
     details = Column(Text, nullable=True)
-

@@ -85,8 +85,9 @@ for student_data in students_data:
         new_student = User(
             name=student_data["name"],
             email=student_data["email"],
-            password=hash_pwd(student_data["password"]),
+            pwd_hash=hash_pwd(student_data["password"]),
             role="student",
+            active=True,
             student_id=student_data["student_id"],
             student_class=student_data["student_class"],
             valid_until=datetime.now() + timedelta(days=365),
@@ -132,7 +133,7 @@ for student_data in students_data:
     print(f"\nParent of {student_data['name']}:")
     print(f"  👤 Name: {student_data['parent_name']}")
     print(f"  📱 Phone: {student_data['parent_phone']}")
-    print(f"  🔗 Setup Link: http://localhost:8080/frontend/parent/index.html?student_id={student_data['student_id']}&student_name={student_data['name']}")
+    print("  🔗 Secure parent link must be generated from the student portal after login")
 
 print("\n" + "="*60)
 print("🧪 QUICK TEST INSTRUCTIONS")
@@ -141,20 +142,21 @@ print("""
 1. LOGIN AS STUDENT:
    - Go to: http://localhost:8080/frontend/student/index.html
    - Use any student credentials above
-   - Enable notifications in the portal
-   - Get the parent portal link
+   - Open the Browser Alerts & Parent Access card
+   - Save parent contact details
+   - Copy the secure parent portal link
 
 2. SETUP PARENT NOTIFICATIONS:
-   - Use the parent portal link OR go directly to parent portal
-   - Enter student ID (e.g., U22CN361)
-   - Enter student name (e.g., Madhavi)
+   - Use the secure parent portal link from the student portal
+   - Student ID and student name should already be pre-filled
    - Enter parent name (e.g., Rajesh Kumar)
    - Enter phone number (e.g., +919876543210)
-   - Click "Enable Notifications"
+   - Click "Continue Setup"
 
 3. TEST NOTIFICATIONS:
-   - Admin approves pass → Student gets notification
-   - Guard scans QR → Parent gets notification
+   - Admin approves pass → Student sees approval state
+   - Guard scans QR → Parent history updates
+   - SMS alerts require backend Twilio configuration
 """)
 
 print("="*60 + "\n")

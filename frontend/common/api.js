@@ -1,19 +1,32 @@
 // Centralized API Client for Smart Gate System
 
-// Get API base URL from config
-// Get API base URL from config
-const getAPIBase = () => {
-    if (typeof CONFIG !== 'undefined' && CONFIG.API_BASE) {
-        return CONFIG.API_BASE;
+const isPublicAuthEndpoint = (endpoint) => {
+    if (!endpoint) return false;
+    return endpoint === '/auth/login' || endpoint === '/auth/register';
+};
+
+const runtimeApi = (typeof CONFIG !== 'undefined' && typeof CONFIG.createApiClient === 'function')
+    ? CONFIG.createApiClient()
+    : {
+        getBase: () => window.location.origin,
+        async fetch(path, options = {}) {
+            return fetch(`${window.location.origin}${path}`, options);
+        }
+    };
+
+const handleSessionExpiry = () => {
+    if (typeof NotificationManager !== 'undefined' && NotificationManager?.error) {
+        NotificationManager.error('Session expired. Please login again.');
     }
-    return window.location.hostname === 'localhost'
-        ? 'http://localhost:8080'
-        : window.location.origin;
+    API.removeToken();
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 2000);
 };
 
 // API Client
 const API = {
-    baseURL: getAPIBase(),
+    baseURL: runtimeApi.getBase(),
 
     // Set authorization token
     setToken: (token) => {
@@ -30,18 +43,21 @@ const API = {
         localStorage.removeItem('token');
     },
 
+    fetchWithFallback: async (endpoint, options = {}) => {
+        const response = await runtimeApi.fetch(endpoint, options);
+        API.baseURL = runtimeApi.getBase();
+        return response;
+    },
+
     // Make authenticated request
     request: async (endpoint, options = {}) => {
         const token = API.getToken();
+        const publicAuthEndpoint = isPublicAuthEndpoint(endpoint);
 
-        // Check token expiry before making request
-        if (token && typeof TokenManager !== 'undefined') {
+        // Check token expiry before making request for protected endpoints.
+        if (token && typeof TokenManager !== 'undefined' && !publicAuthEndpoint) {
             if (TokenManager.isExpired(token)) {
-                NotificationManager.error('Session expired. Please login again.');
-                API.removeToken();
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 2000);
+                handleSessionExpiry();
                 throw new Error('Token expired');
             }
         }
@@ -54,21 +70,17 @@ const API = {
             }
         };
 
-        // Add authorization header if token exists
-        if (token && !endpoint.includes('/auth/login')) {
+        // Add authorization header for all protected endpoints, including /auth/me.
+        if (token && !publicAuthEndpoint) {
             config.headers['Authorization'] = `Bearer ${token}`;
         }
 
         try {
-            const response = await fetch(`${API.baseURL}${endpoint}`, config);
+            const response = await API.fetchWithFallback(endpoint, config);
 
-            // Handle 401 Unauthorized
-            if (response.status === 401) {
-                NotificationManager.error('Session expired. Please login again.');
-                API.removeToken();
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 2000);
+            // Handle 401 Unauthorized for protected endpoints.
+            if (response.status === 401 && !publicAuthEndpoint) {
+                handleSessionExpiry();
                 throw new Error('Unauthorized');
             }
 
@@ -112,7 +124,7 @@ const API = {
     postForm: async (endpoint, formData) => {
         const token = API.getToken();
 
-        const response = await fetch(`${API.baseURL}${endpoint}`, {
+        const response = await API.fetchWithFallback(endpoint, {
             method: 'POST',
             headers: {
                 'Authorization': token ? `Bearer ${token}` : undefined
@@ -130,7 +142,7 @@ const API = {
             formData.append(key, value);
         }
 
-        const response = await fetch(`${API.baseURL}${endpoint}`, {
+        const response = await API.fetchWithFallback(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -151,7 +163,16 @@ const AuthAPI = {
         });
 
         if (!response.ok) {
-            throw new Error('Invalid credentials');
+            let errorMsg = 'Invalid credentials';
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.detail || errorData.message || errorMsg;
+            } catch {
+                errorMsg = response.status >= 500
+                    ? `Server Error (${response.status})`
+                    : errorMsg;
+            }
+            throw new Error(errorMsg);
         }
 
         const data = await response.json();
@@ -160,8 +181,24 @@ const AuthAPI = {
             throw new Error('Invalid response: No access token received');
         }
 
-        API.setToken(data.access_token);
         return data;
+    },
+
+    register: async (userData) => {
+        const response = await API.post('/auth/register', userData);
+
+        if (!response.ok) {
+            let errorMsg = 'Registration failed';
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.detail || errorMsg;
+            } catch {
+                errorMsg = await response.text() || errorMsg;
+            }
+            throw new Error(errorMsg);
+        }
+
+        return await response.json();
     },
 
     logout: () => {
@@ -187,11 +224,17 @@ const AuthAPI = {
 };
 
 const PassAPI = {
-    request: async (passType, reason) => {
-        const response = await API.post('/api/student/request_pass', {
+    request: async (passType, reason, location = null) => {
+        const payload = {
             pass_type: passType,
             reason: reason
-        });
+        };
+        if (location) {
+            payload.latitude = location.latitude;
+            payload.longitude = location.longitude;
+        }
+
+        const response = await API.post('/passes', payload);
 
         if (!response.ok) {
             const error = await response.text();
@@ -202,7 +245,7 @@ const PassAPI = {
     },
 
     list: async () => {
-        const response = await API.get('/api/student/my_passes');
+        const response = await API.get('/passes');
 
         if (!response.ok) {
             throw new Error('Failed to load passes');
@@ -215,10 +258,11 @@ const PassAPI = {
     dailyEntry: async (passType, location = null) => {
         const payload = { pass_type: passType };
         if (location) {
-            payload.location = location;
+            payload.latitude = location.latitude;
+            payload.longitude = location.longitude;
         }
 
-        const response = await API.post('/api/student/daily_entry', payload);
+        const response = await API.post('/passes/daily-entry', payload);
 
         if (!response.ok) {
             const error = await response.text();
@@ -241,7 +285,7 @@ const PassAPI = {
 
 const AdminAPI = {
     listPasses: async () => {
-        const response = await API.get('/api/admin/passes');
+        const response = await API.get('/passes');
 
         if (!response.ok) {
             throw new Error('Failed to load passes');
@@ -252,7 +296,7 @@ const AdminAPI = {
     },
 
     approvePass: async (passId) => {
-        const response = await API.post(`/api/admin/approve_pass/${passId}`, {});
+        const response = await API.post(`/passes/${passId}/approve`, {});
 
         if (!response.ok) {
             throw new Error('Failed to approve pass');
@@ -262,7 +306,7 @@ const AdminAPI = {
     },
 
     rejectPass: async (passId) => {
-        const response = await API.post(`/api/admin/reject_pass/${passId}`, {});
+        const response = await API.post(`/passes/${passId}/reject`, {});
 
         if (!response.ok) {
             throw new Error('Failed to reject pass');
@@ -272,7 +316,7 @@ const AdminAPI = {
     },
 
     getLogs: async () => {
-        const response = await API.get('/api/admin/logs');
+        const response = await API.get('/scans');
 
         if (!response.ok) {
             throw new Error('Failed to load logs');
@@ -286,9 +330,9 @@ const AdminAPI = {
 const FaceAPI = {
     register: async (imageFile) => {
         const formData = new FormData();
-        formData.append('face_image', imageFile);
+        formData.append('file', imageFile);
 
-        const response = await API.postForm('/api/student/register_face', formData);
+        const response = await API.postForm('/api/register_face', formData);
 
         if (!response.ok) {
             const error = await response.text();
@@ -299,7 +343,7 @@ const FaceAPI = {
     },
 
     getStatus: async () => {
-        const response = await API.get('/api/student/face_status');
+        const response = await API.get('/api/face_status');
 
         if (!response.ok) {
             throw new Error('Failed to get face status');
@@ -311,13 +355,26 @@ const FaceAPI = {
     verify: async (studentId, imageFile) => {
         const formData = new FormData();
         formData.append('student_id', studentId);
-        formData.append('face_image', imageFile);
+        formData.append('file', imageFile);
 
-        const response = await API.postForm('/api/guard/verify_face', formData);
+        const response = await API.postForm('/api/verify_face', formData);
 
         if (!response.ok) {
             const error = await response.text();
             throw new Error(error || 'Verification failed');
+        }
+
+        return await response.json();
+    }
+};
+
+const ParentAPI = {
+    getAccessToken: async () => {
+        const response = await API.get('/api/parent/access-token');
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error || 'Failed to create parent access link');
         }
 
         return await response.json();
@@ -336,7 +393,7 @@ const NotificationAPI = {
     },
 
     saveToken: async (fcmToken) => {
-        const response = await API.post('/api/student/save_fcm_token', {
+        const response = await API.post('/api/register_fcm_token', {
             fcm_token: fcmToken
         });
 
@@ -348,8 +405,8 @@ const NotificationAPI = {
     },
 
     saveContact: async (studentPhone, parentName, parentPhone) => {
-        const response = await API.post('/api/student/save_contact', {
-            student_phone: studentPhone,
+        const response = await API.post('/api/update_contact', {
+            phone: studentPhone,
             parent_name: parentName,
             parent_phone: parentPhone
         });
@@ -370,6 +427,7 @@ if (typeof module !== 'undefined' && module.exports) {
         PassAPI,
         AdminAPI,
         FaceAPI,
-        NotificationAPI
+        NotificationAPI,
+        ParentAPI
     };
 }

@@ -18,16 +18,26 @@ try:
     # Initialize Firebase Admin SDK
     cred_path = os.path.join(os.path.dirname(__file__), "firebase-credentials.json")
     
-    if os.path.exists(cred_path):
+    # Try reading from environment variable first
+    firebase_json_env = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    
+    if firebase_json_env:
+        import json
+        cred_dict = json.loads(firebase_json_env)
+        cred = credentials.Certificate(cred_dict)
+        firebase_admin.initialize_app(cred)
+        FIREBASE_ENABLED = True
+        print("✅ Firebase Admin SDK initialized successfully from environment variable")
+        print(f"   Project: {cred.project_id}")
+    elif os.path.exists(cred_path):
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
         FIREBASE_ENABLED = True
-        print("✅ Firebase Admin SDK initialized successfully")
+        print("✅ Firebase Admin SDK initialized successfully from file")
         print(f"   Project: {cred.project_id}")
     else:
         FIREBASE_ENABLED = False
-        print("⚠️  firebase-credentials.json not found")
-        print(f"   Looking for: {cred_path}")
+        print("⚠️  firebase-credentials.json and FIREBASE_CREDENTIALS_JSON not found")
         
 except ImportError:
     FIREBASE_ENABLED = False
@@ -329,6 +339,30 @@ def notify_admin_new_request(admin_fcm: List[str], student_name: str, pass_id: i
     
     if admin_fcm:
         send_push_to_multiple(admin_fcm, title, body, {"pass_id": str(pass_id), "type": "new_request"})
+
+
+def notify_admin_registration_request(
+    admin_fcm: List[str],
+    requester_name: str,
+    requester_email: str,
+    requested_role: str,
+):
+    """Notify admins of a new account registration request"""
+    role_label = "security guard" if requested_role == "guard" else "authorized personnel"
+    title = "👤 New Account Request"
+    body = f"{requester_name} requested {role_label} access ({requester_email})"
+
+    if admin_fcm:
+        send_push_to_multiple(
+            admin_fcm,
+            title,
+            body,
+            {
+                "type": "registration_request",
+                "email": requester_email,
+                "requested_role": requested_role,
+            },
+        )
 
 
 # =====================

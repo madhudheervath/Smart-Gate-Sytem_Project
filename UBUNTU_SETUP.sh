@@ -141,9 +141,9 @@ print_success "dlib installed successfully"
 # ============================================================================
 print_header "📦 Step 5: Installing Python Dependencies"
 
-if [ -f "requirements.txt" ]; then
-    print_info "Installing packages from requirements.txt..."
-    python3 -m pip install -r requirements.txt
+if [ -f "backend/requirements.txt" ]; then
+    print_info "Installing packages from backend/requirements.txt..."
+    python3 -m pip install -r backend/requirements.txt
     
     # Install additional dependencies that might be missing
     print_info "Installing additional Python packages..."
@@ -207,17 +207,20 @@ else
 fi
 
 # ============================================================================
-# STEP 7: Create Virtual Environment (Optional but Recommended)
+# STEP 7: Create Virtual Environment (Matches runtime scripts)
 # ============================================================================
 print_header "🔧 Step 7: Setting up Virtual Environment"
 
-if [ ! -d "venv" ]; then
-    print_info "Creating virtual environment..."
-    python3 -m venv venv
+if [ ! -d "backend/.venv" ]; then
+    print_info "Creating backend virtual environment..."
+    python3 -m venv backend/.venv
     print_success "Virtual environment created"
-    print_info "To activate: source venv/bin/activate"
+    print_info "Installing Python dependencies into backend/.venv..."
+    backend/.venv/bin/pip install --upgrade pip
+    backend/.venv/bin/pip install -r backend/requirements.txt
+    print_info "To activate: source backend/.venv/bin/activate"
 else
-    print_info "Virtual environment already exists"
+    print_info "backend/.venv already exists"
 fi
 
 # ============================================================================
@@ -225,16 +228,17 @@ fi
 # ============================================================================
 print_header "🗃️  Step 8: Initializing Database"
 
-if [ -f "backend/init_db.py" ]; then
-    print_info "Running database initialization..."
+if [ -f "backend/bootstrap.py" ]; then
+    print_info "Running database bootstrap..."
     cd backend
-    python3 init_db.py
+    python3 bootstrap.py
+    python3 add_students_with_parents.py
     cd ..
-    print_success "Database initialized successfully"
+    print_success "Database bootstrapped successfully"
 else
-    print_warning "init_db.py not found, skipping database initialization"
+    print_warning "bootstrap.py not found, skipping database initialization"
     print_info "You can initialize manually later by running:"
-    print_info "  cd backend && python3 init_db.py"
+    print_info "  cd backend && python3 bootstrap.py"
 fi
 
 # ============================================================================
@@ -321,8 +325,8 @@ echo "  ✓ Image processing libraries"
 echo "  ✓ dlib (face recognition)"
 echo "  ✓ All Python dependencies"
 echo "  ✓ SQLite database"
-echo "  ✓ Virtual environment"
-echo "  ✓ Database initialized"
+echo "  ✓ backend/.venv virtual environment"
+echo "  ✓ Database bootstrapped"
 echo ""
 echo "🚀 Next Steps:"
 echo ""
@@ -336,8 +340,9 @@ echo "     Parent:  http://localhost:8080/frontend/parent/index.html"
 echo "     Guard:   http://localhost:8080/frontend/guard/index.html"
 echo ""
 echo "  3. Test credentials:"
-echo "     Student: student1@uni.edu / s123456"
+echo "     Student: u22cn361@cmrtc.ac.in / madhavi123"
 echo "     Admin:   admin@uni.edu / admin123"
+echo "     Guard:   scanner@uni.edu / scanner123"
 echo "     Guard:   guard@uni.edu / guard123"
 echo ""
 echo "📚 Documentation:"

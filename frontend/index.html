@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -28,7 +29,7 @@
             color: #2d3748;
             font-size: 3rem;
             margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         p.subtitle {
@@ -50,12 +51,12 @@
             padding: 30px 20px;
             text-decoration: none;
             color: inherit;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
             align-items: center;
-            border: 1px solid rgba(255,255,255,0.5);
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
         .portal-card:hover {
@@ -84,27 +85,56 @@
         }
 
         /* Card specific colors on hover */
-        .portal-card.student:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
-        .portal-card.guard:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
-        .portal-card.admin:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
-        .portal-card.parent:hover .icon { transform: scale(1.1); transition: transform 0.3s; }
+        .portal-card.student:hover .icon {
+            transform: scale(1.1);
+            transition: transform 0.3s;
+        }
+
+        .portal-card.guard:hover .icon {
+            transform: scale(1.1);
+            transition: transform 0.3s;
+        }
+
+        .portal-card.admin:hover .icon {
+            transform: scale(1.1);
+            transition: transform 0.3s;
+        }
+
+        .portal-card.parent:hover .icon {
+            transform: scale(1.1);
+            transition: transform 0.3s;
+        }
 
         @media (prefers-color-scheme: dark) {
             body {
                 background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             }
-            h1 { color: #fff; }
-            p.subtitle { color: #a0aec0; }
+
+            h1 {
+                color: #fff;
+            }
+
+            p.subtitle {
+                color: #a0aec0;
+            }
+
             .portal-card {
                 background: rgba(30, 30, 50, 0.8);
                 backdrop-filter: blur(10px);
-                border-color: rgba(255,255,255,0.1);
+                border-color: rgba(255, 255, 255, 0.1);
             }
-            .portal-title { color: #fff; }
-            .portal-desc { color: #cbd5e0; }
+
+            .portal-title {
+                color: #fff;
+            }
+
+            .portal-desc {
+                color: #cbd5e0;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <div class="container">
@@ -115,14 +145,14 @@
             <!-- Student Portal -->
             <a href="student/index.html" class="portal-card student">
                 <span class="icon">🎓</span>
-                <span class="portal-title">Student Portal</span>
+                <span class="portal-title">Authorized Personnel Portal</span>
                 <span class="portal-desc">Generate pass QR codes, view history, and manage your profile.</span>
             </a>
 
             <!-- Guard Portal -->
             <a href="guard/index.html" class="portal-card guard">
                 <span class="icon">👮</span>
-                <span class="portal-title">Guard Portal</span>
+                <span class="portal-title">Security Checkpoint Portal</span>
                 <span class="portal-desc">Scan QR codes, verify identities, and monitor gate entries.</span>
             </a>
 
@@ -136,11 +166,12 @@
             <!-- Admin Portal -->
             <a href="admin/index.html" class="portal-card admin">
                 <span class="icon">🛡️</span>
-                <span class="portal-title">Admin Portal</span>
+                <span class="portal-title">Access Control Administrator Portal</span>
                 <span class="portal-desc">Manage users, approve passes, and view system analytics.</span>
             </a>
         </div>
     </div>
 
 </body>
+
 </html>

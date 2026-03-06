@@ -4,7 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Portal - GatePass</title>
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Access Control Administrator Portal - GatePass</title>
     <link rel="stylesheet" href="style.css?v=2025">
 </head>
 
@@ -13,16 +16,16 @@
     <div id="loginPage" class="page active">
         <div class="container">
             <div class="card">
-                <h1>🛡️ Admin Portal</h1>
+                <h1>🛡️ Access Control Administrator Portal</h1>
                 <h2>Login</h2>
                 <form id="loginForm">
                     <div class="form-group">
                         <label for="email">Email</label>
-                        <input type="email" id="email" value="admin@uni.edu" required>
+                        <input type="email" id="email" placeholder="Enter admin email" required>
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" value="admin123" required>
+                        <input type="password" id="password" placeholder="Enter password" required>
                     </div>
                     <div id="loginError" class="error"></div>
                     <button type="submit" class="btn btn-primary">Login</button>
@@ -35,7 +38,7 @@
     <div id="dashboardPage" class="page">
         <div class="navbar">
             <div class="nav-content">
-                <h1>🛡️ Admin Dashboard</h1>
+                <h1>🛡️ Access Control Administrator Dashboard</h1>
                 <div class="nav-right">
                     <span id="userName" class="user-name"></span>
                     <button onclick="logout()" class="btn btn-secondary">Logout</button>
@@ -59,6 +62,10 @@
             <!-- Stats Cards -->
             <div class="stats-grid">
                 <div class="stat-card">
+                    <div class="stat-number" id="registrationPendingCount">0</div>
+                    <div class="stat-label">Pending Account Requests</div>
+                </div>
+                <div class="stat-card">
                     <div class="stat-number" id="pendingCount">0</div>
                     <div class="stat-label">Pending Requests</div>
                 </div>
@@ -76,22 +83,59 @@
                 </div>
             </div>
 
+            <div class="card">
+                <div class="filter-bar">
+                    <h2 style="margin: 0;">Account Registration Requests</h2>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; align-items:center;">
+                        <button class="filter-btn request-filter-btn active" data-request-status="pending"
+                            onclick="filterRegistrationRequests('pending')">
+                            ⏳ Pending
+                        </button>
+                        <button class="filter-btn request-filter-btn" data-request-status="approved"
+                            onclick="filterRegistrationRequests('approved')">
+                            ✅ Approved
+                        </button>
+                        <button class="filter-btn request-filter-btn" data-request-status="rejected"
+                            onclick="filterRegistrationRequests('rejected')">
+                            ❌ Rejected
+                        </button>
+                        <button class="filter-btn request-filter-btn" data-request-status="all"
+                            onclick="filterRegistrationRequests('all')">
+                            📋 All
+                        </button>
+                        <button class="btn btn-secondary" id="enableAdminAlertsBtn" onclick="enableAdminBrowserAlerts()">
+                            🔔 Enable Browser Alerts
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshRegistrationRequests()">
+                        🔄 Refresh Requests
+                        </button>
+                    </div>
+                </div>
+                <div id="requestNotificationBanner"
+                    style="display:none; margin:16px 0; padding:14px 16px; border-radius:10px;">
+                    <strong style="display:block; margin-bottom:4px;">Account Request Notification</strong>
+                    <span id="requestNotificationMessage"></span>
+                </div>
+                <p id="requestAlertStatus" style="margin: 0 0 12px 0; color:#666; font-size:14px;"></p>
+                <div id="registrationRequestsContainer"></div>
+            </div>
+
             <!-- Filters -->
             <div class="card">
                 <div class="filter-bar">
-                    <button class="filter-btn active" data-status="pending" onclick="filterPasses('pending')">
+                    <button class="filter-btn pass-filter-btn active" data-status="pending" onclick="filterPasses('pending')">
                         ⏳ Pending
                     </button>
-                    <button class="filter-btn" data-status="approved" onclick="filterPasses('approved')">
+                    <button class="filter-btn pass-filter-btn" data-status="approved" onclick="filterPasses('approved')">
                         ✅ Approved
                     </button>
-                    <button class="filter-btn" data-status="rejected" onclick="filterPasses('rejected')">
+                    <button class="filter-btn pass-filter-btn" data-status="rejected" onclick="filterPasses('rejected')">
                         ❌ Rejected
                     </button>
-                    <button class="filter-btn" data-status="used" onclick="filterPasses('used')">
+                    <button class="filter-btn pass-filter-btn" data-status="used" onclick="filterPasses('used')">
                         🚪 Used
                     </button>
-                    <button class="filter-btn" data-status="" onclick="filterPasses('')">
+                    <button class="filter-btn pass-filter-btn" data-status="" onclick="filterPasses('')">
                         📋 All
                     </button>
                     <button class="btn btn-secondary" onclick="loadPasses()" style="margin-left: auto;">
@@ -108,8 +152,8 @@
         </div>
     </div>
 
-    <script src="../common/config.js"></script>
-    <script src="app.js?v=2025"></script>
+    <script src="../common/config.js?v=20260306h"></script>
+    <script src="app.js?v=20260306h"></script>
 </body>
 
 </html>

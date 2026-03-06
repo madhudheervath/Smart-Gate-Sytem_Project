@@ -21,16 +21,42 @@ def create_access_token(data: dict, minutes: int = settings.ACCESS_TOKEN_EXPIRE_
     to_encode["exp"] = datetime.utcnow() + timedelta(minutes=minutes)
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def create_parent_access_token(student_id: str, minutes: int = settings.PARENT_ACCESS_TOKEN_EXPIRE_MINUTES):
+    payload = {
+        "student_id": student_id,
+        "scope": "parent_portal",
+        "exp": datetime.utcnow() + timedelta(minutes=minutes),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
+
+def verify_parent_access_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid parent access token")
+
+    if payload.get("scope") != "parent_portal":
+        raise HTTPException(status_code=403, detail="Invalid parent access scope")
+
+    student_id = payload.get("student_id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Invalid parent access token")
+    return str(student_id)
+
+def get_user_from_token(token: str, db: Session) -> User:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
         uid: int = int(payload.get("sub"))
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+
     user = db.get(User, uid)
     if not user or not user.active:
         raise HTTPException(status_code=401, detail="User inactive")
     return user
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    return get_user_from_token(token, db)
 
 def require_role(*roles):
     def _dep(user: User = Depends(get_current_user)):

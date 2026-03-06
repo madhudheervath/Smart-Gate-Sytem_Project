@@ -4,7 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gate Scanner Portal - GatePass</title>
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Security Checkpoint Portal - GatePass</title>
     <link rel="stylesheet" href="style.css?v=2025-aligned">
     <link rel="stylesheet" href="face-verify-styles.css">
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -15,16 +18,16 @@
     <div id="loginPage" class="page active">
         <div class="container">
             <div class="card">
-                <h1>🔍 Gate Scanner</h1>
+                <h1>🔍 Security Checkpoint</h1>
                 <h2>Login</h2>
                 <form id="loginForm">
                     <div class="form-group">
                         <label for="email">Email</label>
-                        <input type="email" id="email" value="scanner@uni.edu" required>
+                        <input type="email" id="email" placeholder="Enter guard email" required>
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" value="scanner123" required>
+                        <input type="password" id="password" placeholder="Enter password" required>
                     </div>
                     <div id="loginError" class="error"></div>
                     <button type="submit" class="btn btn-primary">Login</button>
@@ -37,7 +40,7 @@
     <div id="scannerPage" class="page">
         <div class="navbar">
             <div class="nav-content">
-                <h1>🔍 Gate Scanner</h1>
+                <h1>🔍 Security Checkpoint</h1>
                 <div class="nav-right">
                     <span id="userName" class="user-name"></span>
                     <button onclick="logout()" class="btn btn-secondary">Logout</button>
@@ -145,9 +148,9 @@
         </div>
     </div>
 
-    <script src="face-verify-sequential.js"></script>
-    <script src="../common/config.js"></script>
-    <script src="app.js?v=2025-entry-exit"></script>
+    <script src="face-verify-sequential.js?v=20260306g"></script>
+    <script src="../common/config.js?v=20260306g"></script>
+    <script src="app.js?v=20260306g"></script>
 </body>
 
 </html>

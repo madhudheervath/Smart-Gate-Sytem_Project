@@ -20,7 +20,11 @@ echo ""
 echo "Checking installed packages:"
 echo "----------------------------"
 
-source venv/bin/activate 2>/dev/null
+if [ -f "backend/.venv/bin/activate" ]; then
+    source backend/.venv/bin/activate
+elif [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+fi
 
 # Check each package
 packages=("face-recognition" "opencv-python" "Pillow" "dlib")

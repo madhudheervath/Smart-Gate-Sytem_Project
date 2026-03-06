@@ -1,15 +1,25 @@
 
 
-from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from database import Base, engine, get_db
-from models import User, PassRequest, ScanLog
+from database import Base, engine, get_db, SessionLocal
+from models import User, RegistrationRequest, PassRequest, ScanLog
 from schemas import *
-from auth import hash_pwd, verify_pwd, create_access_token, get_current_user, require_role
+from schemas import UserRegister
+from auth import (
+    hash_pwd,
+    verify_pwd,
+    create_access_token,
+    create_parent_access_token,
+    get_current_user,
+    get_user_from_token,
+    require_role,
+    verify_parent_access_token,
+)
 from crypto import make_qr_token, parse_token
 from settings import settings
 from crud import log_scan, mark_used
@@ -62,7 +72,10 @@ def now_ist():
 app = FastAPI(title="GatePass QR Prototype")
 
 @app.get("/debug/users")
-def list_users(db: Session = Depends(get_db)):
+def list_users(
+    user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
     users = db.query(User).all()
     return [
         {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "student_id": u.student_id, "active": u.active}
@@ -70,7 +83,12 @@ def list_users(db: Session = Depends(get_db)):
     ]
 
 @app.get("/debug/check_password")
-def debug_check_password(email: str, password: str, db: Session = Depends(get_db)):
+def debug_check_password(
+    email: str,
+    password: str,
+    user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return {"status": "error", "message": "User not found"}
@@ -88,7 +106,7 @@ def debug_check_password(email: str, password: str, db: Session = Depends(get_db
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -96,19 +114,329 @@ app.add_middleware(
 # create tables
 Base.metadata.create_all(bind=engine)
 
+ALLOWED_ACCOUNT_REQUEST_ROLES = {"personnel", "student", "guard"}
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _normalize_account_request_role(role: Optional[str]) -> str:
+    normalized = (role or "personnel").strip().lower()
+    if normalized == "student":
+        return "personnel"
+    return normalized
+
+
+def _account_request_role_to_user_role(role: Optional[str]) -> str:
+    normalized = _normalize_account_request_role(role)
+    return "guard" if normalized == "guard" else "student"
+
+
+def _user_role_to_account_request_role(role: Optional[str]) -> Optional[str]:
+    if role is None:
+        return None
+    normalized = role.strip().lower()
+    if normalized == "student":
+        return "personnel"
+    return normalized
+
+
+def _account_request_role_label(role: Optional[str], *, title_case: bool = False) -> str:
+    normalized = _normalize_account_request_role(role)
+    label = "security guard" if normalized == "guard" else "authorized personnel"
+    return label.title() if title_case else label
+
+
+def _build_valid_until(role: str) -> Optional[datetime]:
+    if role != "student":
+        return None
+    current_year = now_ist().year
+    return datetime(current_year + 1, 6, 30, tzinfo=IST)
+
+
+def _get_latest_registration_request(db: Session, email: str) -> Optional[RegistrationRequest]:
+    return (
+        db.query(RegistrationRequest)
+        .filter(RegistrationRequest.email == email)
+        .order_by(RegistrationRequest.created_at.desc(), RegistrationRequest.id.desc())
+        .first()
+    )
+
+
+def _notify_admins_of_registration_request(db: Session, request: RegistrationRequest) -> None:
+    if not NOTIFICATIONS_ENABLED:
+        return
+
+    try:
+        admin_users = db.query(User).filter(User.role == "admin", User.fcm_token.isnot(None)).all()
+        admin_tokens = [admin.fcm_token for admin in admin_users if admin.fcm_token]
+        if admin_tokens:
+            notifications.notify_admin_registration_request(
+                admin_tokens,
+                request.name,
+                request.email,
+                _normalize_account_request_role(request.requested_role),
+            )
+            print(f"✅ Notified {len(admin_tokens)} admin(s) of registration request #{request.id}")
+    except Exception as e:
+        print(f"⚠️  Registration notification error: {e}")
+
+
+def _serialize_registration_request(db: Session, request: RegistrationRequest) -> RegistrationRequestOut:
+    reviewer_name = None
+    approved_role = None
+
+    if request.reviewed_by:
+        reviewer = db.get(User, request.reviewed_by)
+        reviewer_name = reviewer.name if reviewer else None
+
+    if request.created_user_id:
+        created_user = db.get(User, request.created_user_id)
+        approved_role = _user_role_to_account_request_role(created_user.role) if created_user else None
+
+    return RegistrationRequestOut(
+        id=request.id,
+        name=request.name,
+        email=request.email,
+        requested_role=_normalize_account_request_role(request.requested_role),
+        approved_role=approved_role,
+        student_id=request.student_id,
+        student_class=request.student_class,
+        phone=request.phone,
+        request_reason=request.request_reason,
+        status=request.status,
+        created_at=request.created_at,
+        reviewed_at=request.reviewed_at,
+        reviewed_by=request.reviewed_by,
+        reviewed_by_name=reviewer_name,
+        review_notes=request.review_notes,
+        created_user_id=request.created_user_id,
+    )
+
 # --- Auth ---
 @app.post("/auth/login", response_model=Token)
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form.username).first()
-    if not user or not verify_pwd(form.password, user.pwd_hash):
+    email = _normalize_email(form.username)
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        existing_request = _get_latest_registration_request(db, email)
+        if existing_request:
+            if existing_request.status == "pending":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your access request is pending admin approval.",
+                )
+            if existing_request.status == "rejected":
+                detail = "Your access request was rejected by an administrator."
+                if existing_request.review_notes:
+                    detail = f"{detail} {existing_request.review_notes}"
+                raise HTTPException(status_code=403, detail=detail)
+            if existing_request.status == "approved" and not existing_request.created_user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Your access request was approved, but the account is not ready yet.",
+                )
+        raise HTTPException(status_code=401, detail="Bad credentials")
+    if not user.active:
+        raise HTTPException(status_code=403, detail="Account inactive")
+    if not verify_pwd(form.password, user.pwd_hash):
         raise HTTPException(status_code=401, detail="Bad credentials")
     token = create_access_token({"sub": str(user.id), "role": user.role})
-    return Token(access_token=token, role=user.role)
+    return Token(access_token=token, role=user.role, name=user.name)
 
 # --- Get current user info ---
+@app.post("/auth/register", response_model=RegistrationRequestAck)
+def register_user(user_in: UserRegister, db: Session = Depends(get_db)):
+    """Submit an access request for admin approval."""
+    if not settings.ACCOUNT_REQUESTS_ENABLED:
+        raise HTTPException(
+            status_code=403,
+            detail="New access requests are currently disabled. Contact an administrator.",
+        )
+
+    email = _normalize_email(user_in.email)
+    requested_role = _normalize_account_request_role(user_in.requested_role)
+    if requested_role not in ALLOWED_ACCOUNT_REQUEST_ROLES:
+        raise HTTPException(status_code=400, detail="Only authorized personnel and guard access can be requested")
+
+    student_id = _normalize_optional_text(user_in.student_id)
+    student_class = _normalize_optional_text(user_in.student_class)
+    phone = _normalize_optional_text(user_in.phone)
+    request_reason = _normalize_optional_text(user_in.request_reason)
+
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    if student_id:
+        existing_person = db.query(User).filter(User.student_id == student_id).first()
+        if existing_person:
+            raise HTTPException(status_code=400, detail=f"Personnel ID {student_id} is already in use")
+
+    existing_pending = (
+        db.query(RegistrationRequest)
+        .filter(RegistrationRequest.email == email, RegistrationRequest.status == "pending")
+        .first()
+    )
+    if existing_pending:
+        raise HTTPException(status_code=400, detail="An access request for this email is already pending approval")
+
+    if student_id:
+        existing_pending_id = (
+            db.query(RegistrationRequest)
+            .filter(RegistrationRequest.student_id == student_id, RegistrationRequest.status == "pending")
+            .first()
+        )
+        if existing_pending_id:
+            raise HTTPException(status_code=400, detail=f"Personnel ID {student_id} already has a pending request")
+
+    latest_request = _get_latest_registration_request(db, email)
+    if latest_request and latest_request.status == "rejected" and not latest_request.created_user_id:
+        latest_request.name = user_in.name.strip()
+        latest_request.email = email
+        latest_request.pwd_hash = hash_pwd(user_in.password)
+        latest_request.requested_role = requested_role
+        latest_request.student_id = student_id
+        latest_request.student_class = student_class
+        latest_request.phone = phone
+        latest_request.request_reason = request_reason
+        latest_request.status = "pending"
+        latest_request.created_at = now_ist()
+        latest_request.reviewed_at = None
+        latest_request.reviewed_by = None
+        latest_request.review_notes = None
+        latest_request.created_user_id = None
+        registration_request = latest_request
+    else:
+        registration_request = RegistrationRequest(
+            name=user_in.name.strip(),
+            email=email,
+            pwd_hash=hash_pwd(user_in.password),
+            requested_role=requested_role,
+            student_id=student_id,
+            student_class=student_class,
+            phone=phone,
+            request_reason=request_reason,
+            status="pending",
+        )
+        db.add(registration_request)
+
+    db.commit()
+    db.refresh(registration_request)
+
+    _notify_admins_of_registration_request(db, registration_request)
+
+    role_label = _account_request_role_label(requested_role)
+    print(f"✅ New access request submitted: {registration_request.name} ({registration_request.email})")
+    return RegistrationRequestAck(
+        request_id=registration_request.id,
+        status=registration_request.status,
+        message=f"Your {role_label} access request has been submitted for admin approval.",
+    )
+
 @app.get("/auth/me", response_model=UserOut)
 def get_me(user: User = Depends(get_current_user)):
     return user
+
+
+@app.get("/admin/registration-requests", response_model=List[RegistrationRequestOut])
+def list_registration_requests(
+    request_status: str = Query(default="pending", alias="status"),
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    q = db.query(RegistrationRequest)
+    if request_status != "all":
+        if request_status not in {"pending", "approved", "rejected"}:
+            raise HTTPException(status_code=400, detail="Invalid registration request status")
+        q = q.filter(RegistrationRequest.status == request_status)
+    requests = q.order_by(RegistrationRequest.created_at.desc(), RegistrationRequest.id.desc()).all()
+    return [_serialize_registration_request(db, request) for request in requests]
+
+
+@app.post("/admin/registration-requests/{request_id}/approve", response_model=RegistrationRequestOut)
+def approve_registration_request(
+    request_id: int,
+    review: RegistrationRequestReview,
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    registration_request = db.get(RegistrationRequest, request_id)
+    if not registration_request:
+        raise HTTPException(status_code=404, detail="Registration request not found")
+    if registration_request.status != "pending":
+        raise HTTPException(status_code=400, detail="Registration request has already been reviewed")
+
+    approved_role = _normalize_account_request_role(review.approved_role or registration_request.requested_role)
+    if approved_role not in ALLOWED_ACCOUNT_REQUEST_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid approved role")
+
+    existing_user = db.query(User).filter(User.email == registration_request.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="A user account with this email already exists")
+
+    if registration_request.student_id:
+        existing_person = db.query(User).filter(User.student_id == registration_request.student_id).first()
+        if existing_person:
+            raise HTTPException(status_code=400, detail="Personnel ID is already assigned to another user")
+
+    new_user = User(
+        name=registration_request.name,
+        email=registration_request.email,
+        pwd_hash=registration_request.pwd_hash,
+        role=_account_request_role_to_user_role(approved_role),
+        student_id=registration_request.student_id,
+        student_class=registration_request.student_class,
+        phone=registration_request.phone,
+        active=True,
+        valid_until=_build_valid_until(_account_request_role_to_user_role(approved_role)),
+    )
+    db.add(new_user)
+    db.flush()
+
+    registration_request.status = "approved"
+    registration_request.requested_role = _normalize_account_request_role(registration_request.requested_role)
+    registration_request.reviewed_at = now_ist()
+    registration_request.reviewed_by = admin.id
+    registration_request.review_notes = _normalize_optional_text(review.review_notes)
+    registration_request.created_user_id = new_user.id
+
+    db.commit()
+    db.refresh(registration_request)
+    return _serialize_registration_request(db, registration_request)
+
+
+@app.post("/admin/registration-requests/{request_id}/reject", response_model=RegistrationRequestOut)
+def reject_registration_request(
+    request_id: int,
+    review: RegistrationRequestReview,
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    registration_request = db.get(RegistrationRequest, request_id)
+    if not registration_request:
+        raise HTTPException(status_code=404, detail="Registration request not found")
+    if registration_request.status != "pending":
+        raise HTTPException(status_code=400, detail="Registration request has already been reviewed")
+
+    registration_request.status = "rejected"
+    registration_request.requested_role = _normalize_account_request_role(registration_request.requested_role)
+    registration_request.reviewed_at = now_ist()
+    registration_request.reviewed_by = admin.id
+    registration_request.review_notes = _normalize_optional_text(review.review_notes)
+    registration_request.created_user_id = None
+
+    db.commit()
+    db.refresh(registration_request)
+    return _serialize_registration_request(db, registration_request)
 
 # =====================
 # Notification Endpoints
@@ -116,31 +444,29 @@ def get_me(user: User = Depends(get_current_user)):
 
 @app.post("/api/register_fcm_token")
 def register_fcm_token(
-    fcm_token: str,
+    payload: FCMTokenRegister,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Register FCM token for push notifications"""
-    user.fcm_token = fcm_token
+    user.fcm_token = payload.fcm_token
     user.last_notification_at = datetime.now(IST)
     db.commit()
     return {"message": "FCM token registered successfully", "enabled": NOTIFICATIONS_ENABLED}
 
 @app.post("/api/update_contact")
 def update_contact(
-    phone: Optional[str] = None,
-    parent_name: Optional[str] = None,
-    parent_phone: Optional[str] = None,
+    payload: ContactUpdate,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update student and parent contact information"""
-    if phone:
-        user.phone = phone
-    if parent_name:
-        user.parent_name = parent_name
-    if parent_phone:
-        user.parent_phone = parent_phone
+    if payload.phone is not None:
+        user.phone = payload.phone
+    if payload.parent_name is not None:
+        user.parent_name = payload.parent_name
+    if payload.parent_phone is not None:
+        user.parent_phone = payload.parent_phone
     
     db.commit()
     return {"message": "Contact information updated successfully"}
@@ -153,18 +479,30 @@ def get_notification_status(user: User = Depends(get_current_user)):
     else:
         return {"enabled": False, "message": "Notifications not configured"}
 
-class ParentFCMRegister(BaseModel):
-    student_id: str
-    parent_name: str
-    parent_phone: Optional[str] = None
-    parent_fcm_token: Optional[str] = None
+@app.get("/api/parent/access-token")
+def get_parent_access_token(user: User = Depends(require_role("student"))):
+    """Create a signed parent portal token tied to the current student"""
+    if not user.student_id:
+        raise HTTPException(400, "Student ID is required before sharing parent access")
+
+    return {
+        "student_id": user.student_id,
+        "access_token": create_parent_access_token(user.student_id),
+    }
+
+def _require_parent_access(student_id: str, access_token: str) -> None:
+    token_student_id = verify_parent_access_token(access_token)
+    if token_student_id != student_id:
+        raise HTTPException(403, "Parent access token does not match the requested student")
 
 @app.post("/api/register_parent_fcm")
 def register_parent_fcm(
     data: ParentFCMRegister,
     db: Session = Depends(get_db)
 ):
-    """Register parent FCM token for a student"""
+    """Register parent contact details and optional FCM token for a student"""
+    _require_parent_access(data.student_id, data.access_token)
+
     # Find student by student_id (not database id)
     student = db.query(User).filter(
         User.student_id == data.student_id,
@@ -184,7 +522,7 @@ def register_parent_fcm(
     db.commit()
     
     return {
-        "message": "Parent FCM token registered successfully",
+        "message": "Parent contact registered successfully",
         "student_name": student.name,
         "student_id": student.student_id,
         "parent_name": data.parent_name
@@ -193,9 +531,12 @@ def register_parent_fcm(
 @app.get("/api/parent/student_history/{student_id}")
 def get_student_history_for_parent(
     student_id: str,
+    access_token: str = Query(...),
     db: Session = Depends(get_db)
 ):
     """Get entry/exit history for a student (for parents)"""
+    _require_parent_access(student_id, access_token)
+
     # Find student
     student = db.query(User).filter(
         User.student_id == student_id,
@@ -299,6 +640,7 @@ def list_passes(status: str | None = None, user: User = Depends(get_current_user
             "student_id": p.student_id,
             "reason": p.reason,
             "status": p.status,
+            "pass_type": p.pass_type or "entry",
             "request_time": p.request_time,
             "approved_time": p.approved_time,
             "expiry_time": p.expiry_time,
@@ -404,34 +746,11 @@ async def verify(
     # atomic "use" (simple version: check again then update)
     if pr.used_time:
         return _fail(db, pid, uid, guard.id, "replay", "already-used")
-
-    mark_used(db, pr, guard.id)
-    log_scan(db, pid, pr.student_id, guard.id, "success", "verified", pass_type=pr.pass_type or "entry")
     
     # get student details
     student = db.get(User, pr.student_id)
     student_name = student.name if student else "Unknown"
     student_code = student.student_id if student else f"ID:{pr.student_id}"
-    
-    # Send entry/exit notification to parents
-    if NOTIFICATIONS_ENABLED and student:
-        try:
-            timestamp = now_ist().strftime("%I:%M %p")
-            parent_fcm_tokens = [student.parent_fcm_token] if student.parent_fcm_token else []
-            parent_phones = [student.parent_phone] if student.parent_phone else []
-            
-            if pr.pass_type == "entry":
-                notifications.notify_entry_scan(
-                    student.name, student_code, timestamp, parent_fcm_tokens, parent_phones
-                )
-                print(f"✅ Sent entry notification to parents of {student.name}")
-            elif pr.pass_type == "exit":
-                notifications.notify_exit_scan(
-                    student.name, student_code, timestamp, parent_fcm_tokens, parent_phones
-                )
-                print(f"✅ Sent exit notification to parents of {student.name}")
-        except Exception as e:
-            print(f"⚠️  Parent notification error: {e}")
     
     # Face verification (optional)
     face_verified = None
@@ -492,13 +811,9 @@ async def verify(
                         
                         print(f"DEBUG: Final result - Match: {is_match}, Confidence: {face_confidence}%, Message: {face_message}")
                     else:
-                        face_verified = False
-                        face_message = "No face detected in captured image"
-                        print("DEBUG: No face detected in captured image")
+                        return _fail(db, pid, uid, guard.id, "invalid", "face-not-detected")
                 else:
-                    face_verified = False
-                    face_message = error_msg
-                    print(f"DEBUG: Image validation failed: {error_msg}")
+                    return _fail(db, pid, uid, guard.id, "invalid", f"face-invalid-image:{error_msg}")
             else:
                 face_message = f"{student.name} has not registered face"
                 print(f"DEBUG: {face_message}")
@@ -506,7 +821,33 @@ async def verify(
             print(f"Face verification error: {e}")
             import traceback
             traceback.print_exc()
-            face_message = f"Face verification error: {str(e)}"
+            return _fail(db, pid, uid, guard.id, "invalid", "face-verification-error")
+
+    if face_verified is False:
+        return _fail(db, pid, uid, guard.id, "invalid", "face-mismatch")
+
+    mark_used(db, pr, guard.id)
+    log_scan(db, pid, pr.student_id, guard.id, "success", "verified", pass_type=pr.pass_type or "entry")
+    
+    # Send entry/exit notification to parents
+    if NOTIFICATIONS_ENABLED and student:
+        try:
+            timestamp = now_ist().strftime("%I:%M %p")
+            parent_fcm_tokens = [student.parent_fcm_token] if student.parent_fcm_token else []
+            parent_phones = [student.parent_phone] if student.parent_phone else []
+            
+            if pr.pass_type == "entry":
+                notifications.notify_entry_scan(
+                    student.name, student_code, timestamp, parent_fcm_tokens, parent_phones
+                )
+                print(f"✅ Sent entry notification to parents of {student.name}")
+            elif pr.pass_type == "exit":
+                notifications.notify_exit_scan(
+                    student.name, student_code, timestamp, parent_fcm_tokens, parent_phones
+                )
+                print(f"✅ Sent exit notification to parents of {student.name}")
+        except Exception as e:
+            print(f"⚠️  Parent notification error: {e}")
     
     response = {
         "result": "success", 
@@ -582,7 +923,7 @@ async def auto_daily_entry(
             # Make it timezone-aware (assume it was stored as IST)
             valid_until = valid_until.replace(tzinfo=IST)
         if now_ist() > valid_until:
-            raise HTTPException(status_code=403, detail="Student validity expired. Please contact admin.")
+            raise HTTPException(status_code=403, detail="Student validity expired. Please contact an Access Control Administrator.")
     
     # Check if student already has an active pass of this type for today (IST)
     now_ist_time = now_ist()
@@ -707,7 +1048,7 @@ def get_scan_stats(
     # Failed scans today
     failed_today = db.query(ScanLog).filter(
         ScanLog.scan_time >= today_start,
-        ScanLog.result == "error"
+        ScanLog.result != "success"
     ).count()
     
     # Entry scans today (successful)
@@ -782,7 +1123,7 @@ if FACE_AUTH_ENABLED:
     @app.post("/api/verify_face", response_model=FaceVerificationResponse)
     async def verify_face(
         file: UploadFile = File(...),
-        student_id: int = None,
+        student_id: int = Form(...),
         user: User = Depends(require_role("guard", "admin")),
         db: Session = Depends(get_db)
     ):
@@ -791,9 +1132,6 @@ if FACE_AUTH_ENABLED:
         Used by guards at gate or by admins for testing.
         """
         # Get student to verify
-        if student_id is None:
-            raise HTTPException(status_code=400, detail="student_id is required")
-        
         student = db.get(User, student_id)
         if not student:
             raise HTTPException(status_code=404, detail="Student not found")
@@ -900,12 +1238,11 @@ if GEOFENCE_ENABLED:
 # ============================================================================
 
 if REALTIME_LOGS_ENABLED:
-    from fastapi import WebSocket, WebSocketDisconnect
-    
     @app.get("/api/logs/recent")
     def get_recent_logs_api(
         limit: int = 100,
         offset: int = 0,
+        admin: User = Depends(require_role("admin")),
         db: Session = Depends(get_db)
     ):
         """Get recent scan logs"""
@@ -915,6 +1252,7 @@ if REALTIME_LOGS_ENABLED:
     @app.get("/api/logs/statistics")
     def get_log_statistics_api(
         days: int = 7,
+        admin: User = Depends(require_role("admin")),
         db: Session = Depends(get_db)
     ):
         """Get scan statistics"""
@@ -923,6 +1261,7 @@ if REALTIME_LOGS_ENABLED:
     @app.get("/api/logs/hourly")
     def get_hourly_stats_api(
         date: Optional[str] = None,
+        admin: User = Depends(require_role("admin")),
         db: Session = Depends(get_db)
     ):
         """Get hourly statistics for a specific day"""
@@ -932,6 +1271,7 @@ if REALTIME_LOGS_ENABLED:
     @app.get("/api/logs/daily")
     def get_daily_stats_api(
         days: int = 7,
+        admin: User = Depends(require_role("admin")),
         db: Session = Depends(get_db)
     ):
         """Get daily statistics for last N days"""
@@ -941,6 +1281,7 @@ if REALTIME_LOGS_ENABLED:
     def get_top_active_students_api(
         days: int = 7,
         limit: int = 10,
+        admin: User = Depends(require_role("admin")),
         db: Session = Depends(get_db)
     ):
         """Get most active students"""
@@ -957,6 +1298,7 @@ if REALTIME_LOGS_ENABLED:
         scan_type: Optional[str] = None,
         result: Optional[str] = None,
         limit: int = 100,
+        admin: User = Depends(require_role("admin")),
         db: Session = Depends(get_db)
     ):
         """Search logs with filters"""
@@ -974,12 +1316,26 @@ if REALTIME_LOGS_ENABLED:
         )
         
         return {"logs": logs, "count": len(logs)}
+
+    def _authenticate_admin_websocket(token: Optional[str], db: Session) -> User:
+        if not token:
+            raise HTTPException(status_code=401, detail="Missing WebSocket token")
+
+        user = get_user_from_token(token, db)
+        if user.role != "admin":
+            raise HTTPException(status_code=403, detail="Admin access required")
+        return user
     
     @app.websocket("/ws/logs")
-    async def websocket_logs_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
+    async def websocket_logs_endpoint(websocket: WebSocket):
         """WebSocket endpoint for real-time log updates (Admin only)"""
-        await realtime_logs.manager.connect(websocket)
+        db = SessionLocal()
         try:
+            token = websocket.query_params.get("token")
+            _authenticate_admin_websocket(token, db)
+
+            await realtime_logs.manager.connect(websocket)
+
             # Send initial recent logs
             recent = realtime_logs.get_recent_logs(db, limit=10)
             await websocket.send_json({
@@ -995,9 +1351,13 @@ if REALTIME_LOGS_ENABLED:
                     await websocket.send_json({"type": "pong"})
         except WebSocketDisconnect:
             realtime_logs.manager.disconnect(websocket)
+        except HTTPException as e:
+            await websocket.close(code=1008, reason=e.detail)
         except Exception as e:
             print(f"WebSocket error: {e}")
             realtime_logs.manager.disconnect(websocket)
+        finally:
+            db.close()
 
 # ============================================================================
 # EMERGENCY EXIT FEATURE
@@ -1042,23 +1402,34 @@ def request_emergency_exit(
     # Send notifications
     if NOTIFICATIONS_ENABLED:
         try:
-            # Notify student
-            notifications.send_notification(
-                user_id=user.id,
-                title="🚨 Emergency Exit Granted",
-                message=f"Emergency exit approved at {now.strftime('%I:%M %p')}. Stay safe!",
-                data={"type": "emergency_exit", "timestamp": now.isoformat()}
-            )
+            if user.fcm_token:
+                notifications.send_push_notification(
+                    user.fcm_token,
+                    "Emergency Exit Granted",
+                    f"Emergency exit approved at {now.strftime('%I:%M %p')}. Stay safe!",
+                    {"type": "emergency_exit", "timestamp": now.isoformat()},
+                )
+            if user.phone:
+                notifications.send_sms(
+                    user.phone,
+                    f"Campus GatePass: Emergency exit approved at {now.strftime('%I:%M %p')}. Stay safe!",
+                )
             
             # Notify all admins
             admins = db.query(User).filter(User.role == "admin").all()
             for admin in admins:
-                notifications.send_notification(
-                    user_id=admin.id,
-                    title="🚨 Emergency Exit Alert",
-                    message=f"{user.name} ({user.student_id}) requested emergency exit",
-                    data={"type": "emergency_exit", "student_id": user.student_id, "timestamp": now.isoformat()}
-                )
+                if admin.fcm_token:
+                    notifications.send_push_notification(
+                        admin.fcm_token,
+                        "Emergency Exit Alert",
+                        f"{user.name} ({user.student_id}) requested emergency exit",
+                        {"type": "emergency_exit", "student_id": user.student_id or "", "timestamp": now.isoformat()},
+                    )
+                if admin.phone:
+                    notifications.send_sms(
+                        admin.phone,
+                        f"Emergency exit alert: {user.name} ({user.student_id}) requested emergency exit",
+                    )
         except Exception as e:
             print(f"Failed to send emergency notifications: {e}")
     
@@ -1206,4 +1577,3 @@ async def admin_portal_redirect():
 async def guard_portal_redirect():
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/frontend/guard/index.html")
-

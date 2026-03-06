@@ -24,9 +24,10 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 echo ""
 
-# Run seed script
-echo "Seeding database with demo users..."
-python seed.py
+# Bootstrap database and seed demo data only when needed
+echo "Bootstrapping database..."
+echo "SMARTGATE_SEED_MODE=${SMARTGATE_SEED_MODE:-if_empty}"
+python bootstrap.py
 echo ""
 
 # Start server
@@ -37,4 +38,3 @@ echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""
 uvicorn app:app --reload --port 8080
-

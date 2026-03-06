@@ -4,51 +4,89 @@ let currentUser = null;
 let selectedPassType = 'entry'; // Default to entry
 let currentLocation = null; // GPS coordinates
 
+function showLoginInfo(message) {
+    const infoDiv = document.getElementById('loginInfo');
+    if (!infoDiv) return;
+    infoDiv.textContent = message || '';
+    infoDiv.style.display = message ? 'block' : 'none';
+}
+
+function clearAuthMessages() {
+    const loginError = document.getElementById('loginError');
+    const registerError = document.getElementById('registerError');
+    if (loginError) loginError.textContent = '';
+    if (registerError) registerError.textContent = '';
+    showLoginInfo('');
+}
+
 // Page navigation
 function showPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
 }
 
+// Toggle Auth Form (Login / Register)
+function toggleAuthForm(formType) {
+    const title = document.getElementById('authFormTitle');
+    clearAuthMessages();
+    if (formType === 'register') {
+        if (!CONFIG.FEATURES.ACCOUNT_REQUESTS) {
+            alert('New access requests are disabled. Contact an administrator.');
+            return;
+        }
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+        if (title) title.textContent = 'Request Access';
+    } else {
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('loginForm').style.display = 'block';
+        if (title) title.textContent = 'Login';
+    }
+}
+
+function updateAuthAvailability() {
+    const registerPrompt = document.getElementById('registerPrompt');
+    if (registerPrompt && !CONFIG.FEATURES.ACCOUNT_REQUESTS) {
+        registerPrompt.textContent = 'Accounts are provisioned by administrators. Use your assigned credentials.';
+    }
+}
+
+function clearStudentSession(showLoginPage = true) {
+    localStorage.removeItem('token');
+    token = null;
+    currentUser = null;
+    if (showLoginPage) {
+        showPage('loginPage');
+    }
+}
+
 // Login
 document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('email').value;
+    const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
+    showLoginInfo('');
+    errorDiv.textContent = '';
 
     try {
-        const formData = new URLSearchParams();
-        formData.append('username', email);
-        formData.append('password', password);
-
-        const res = await fetch(`${API_BASE}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData
-        });
-
-        if (!res.ok) {
-            let errorMessage = 'Login failed';
-            try {
-                const errorData = await res.json();
-                errorMessage = errorData.detail || errorData.message || 'Invalid credentials';
-            } catch (e) {
-                errorMessage = `Server Error (${res.status})`;
-            }
-            throw new Error(errorMessage);
-        }
-
-        const data = await res.json();
-        token = data.access_token;
-        localStorage.setItem('token', token);
+        const data = await AuthAPI.login(email, password);
 
         if (data.role !== 'student') {
-            errorDiv.textContent = 'This portal is for students only';
+            clearStudentSession(false);
+            errorDiv.textContent = data.role === 'guard'
+                ? 'This account is approved for the Guard Portal. Please use the guard login page.'
+                : 'This portal is for authorized personnel only';
             return;
         }
 
-        await loadUserInfo();
+        token = data.access_token;
+        localStorage.setItem('token', token);
+
+        const loaded = await loadUserInfo();
+        if (!loaded) {
+            throw new Error('Failed to load user profile');
+        }
         showPage('dashboardPage');
         loadPasses();
     } catch (err) {
@@ -56,13 +94,60 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     }
 });
 
+// Registration
+document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!CONFIG.FEATURES.ACCOUNT_REQUESTS) {
+        document.getElementById('registerError').textContent = 'New access requests are disabled. Contact an administrator.';
+        return;
+    }
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const requested_role = document.getElementById('regAccessType').value;
+    const student_id = document.getElementById('regStudentId').value.trim();
+    const student_class = document.getElementById('regClass').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+    const request_reason = document.getElementById('regReason').value.trim();
+    const errorDiv = document.getElementById('registerError');
+    errorDiv.textContent = '';
+
+    try {
+        const userData = {
+            name,
+            email,
+            password,
+            requested_role,
+            student_id,
+            student_class,
+            phone,
+            request_reason
+        };
+        // Clean empty fields
+        Object.keys(userData).forEach(k => !userData[k] && delete userData[k]);
+
+        const result = await AuthAPI.register(userData);
+        e.target.reset();
+        toggleAuthForm('login');
+        document.getElementById('email').value = email;
+        document.getElementById('password').value = '';
+        showLoginInfo(
+            requested_role === 'guard'
+                ? `${result.message} After approval, sign in through the Guard Portal.`
+                : result.message
+        );
+    } catch (err) {
+        errorDiv.textContent = err.message || 'Registration failed';
+    }
+});
+
 // Load user info
 async function loadUserInfo() {
     try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        currentUser = await res.json();
+        currentUser = await AuthAPI.getMe();
+        if (currentUser.role !== 'student') {
+            throw new Error('Authorized personnel access required');
+        }
 
         // Display user name and student ID if available
         let displayText = currentUser.name;
@@ -75,7 +160,7 @@ async function loadUserInfo() {
         if (currentUser.student_id && document.getElementById('studentInfo')) {
             const validUntil = currentUser.valid_until ? new Date(currentUser.valid_until).toLocaleDateString() : 'N/A';
             document.getElementById('studentInfo').innerHTML = `
-                <p><strong>Student ID:</strong> ${currentUser.student_id}</p>
+                <p><strong>Personnel ID:</strong> ${currentUser.student_id}</p>
                 <p><strong>Class:</strong> ${currentUser.student_class || 'N/A'}</p>
                 <p><strong>Valid Until:</strong> ${validUntil}</p>
             `;
@@ -87,8 +172,11 @@ async function loadUserInfo() {
 
         // Initialize notification card
         initializeNotificationCard();
+        return true;
     } catch (err) {
         console.error('Failed to load user info', err);
+        clearStudentSession();
+        return false;
     }
 }
 
@@ -126,10 +214,7 @@ let selectedFaceFile = null;
 
 async function loadFaceStatus() {
     try {
-        const res = await fetch(`${API_BASE}/api/face_status`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const status = await res.json();
+        const status = await FaceAPI.getStatus();
 
         const faceStatusDiv = document.getElementById('faceStatus');
         const faceRegForm = document.getElementById('faceRegForm');
@@ -181,22 +266,8 @@ async function uploadFace() {
         return;
     }
 
-    const formData = new FormData();
-    formData.append('file', selectedFaceFile);
-
     try {
-        const res = await fetch(`${API_BASE}/api/register_face`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || 'Failed to register face');
-        }
-
-        const result = await res.json();
+        const result = await FaceAPI.register(selectedFaceFile);
         alert('✅ ' + result.message);
 
         // Reset form and reload status
@@ -213,9 +284,7 @@ async function uploadFace() {
 
 // Logout
 function logout() {
-    localStorage.removeItem('token');
-    token = null;
-    currentUser = null;
+    clearStudentSession(false);
 
     // Clear contact form fields to prevent data persistence
     document.getElementById('studentPhone').value = '';
@@ -229,7 +298,7 @@ function logout() {
     showPage('loginPage');
 }
 
-// Quick Daily Entry Pass - AUTO GENERATED (No Admin Approval)
+// Quick Daily Entry Pass - AUTO GENERATED (No Access Control Administrator Approval)
 // Select pass type (entry/exit)
 let selectedRegularPassType = 'entry'; // For regular pass requests
 
@@ -255,7 +324,7 @@ function selectPassType(type) {
     }
 }
 
-// Regular Pass Type Selection (for admin-approved passes)
+// Regular Pass Type Selection (for Access Control Administrator-approved passes)
 function selectRegularPassType(type) {
     selectedRegularPassType = type;
 
@@ -299,28 +368,7 @@ async function requestDailyEntry() {
             }
         }
 
-        const requestBody = {
-            pass_type: selectedPassType,
-            latitude: location ? location.latitude : null,
-            longitude: location ? location.longitude : null
-        };
-        console.log('Request body:', JSON.stringify(requestBody));
-
-        const res = await fetch(`${API_BASE}/passes/daily-entry`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.detail || `Failed to generate daily ${passLabel.toLowerCase()} pass`);
-        }
-
-        const pass = await res.json();
+        const pass = await PassAPI.dailyEntry(selectedPassType, location);
 
         console.log('Pass created:', pass);
         console.log('Pass type in response:', pass.pass_type);
@@ -357,23 +405,9 @@ document.getElementById('passForm')?.addEventListener('submit', async (e) => {
     }
 
     try {
-        const res = await fetch(`${API_BASE}/passes`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                reason: reason,
-                pass_type: selectedRegularPassType,
-                latitude: location ? location.latitude : null,
-                longitude: location ? location.longitude : null
-            })
-        });
+        await PassAPI.request(selectedRegularPassType, reason, location);
 
-        if (!res.ok) throw new Error('Failed to create pass request');
-
-        alert(`✅ ${passLabel} Pass request submitted!\n\nPass Type: ${selectedRegularPassType}\nWaiting for admin approval.`);
+        alert(`✅ ${passLabel} Pass request submitted!\n\nPass Type: ${selectedRegularPassType}\nWaiting for Access Control Administrator approval.`);
         document.getElementById('reason').value = '';
         loadPasses();
     } catch (err) {
@@ -384,10 +418,7 @@ document.getElementById('passForm')?.addEventListener('submit', async (e) => {
 // Load passes
 async function loadPasses() {
     try {
-        const res = await fetch(`${API_BASE}/passes`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const passes = await res.json();
+        const passes = await PassAPI.list();
 
         // Find latest approved pass
         const approved = passes.filter(p => p.status === 'approved');
@@ -458,7 +489,8 @@ function showPassHistory(passes) {
 
 // Check if already logged in
 if (token) {
-    loadUserInfo().then(() => {
+    loadUserInfo().then((loaded) => {
+        if (!loaded) return;
         showPage('dashboardPage');
         loadPasses();
     });
@@ -475,18 +507,24 @@ setInterval(() => {
 // Notification Functions
 // =====================
 
-let studentFCMToken = null;
+function hasBrowserNotifications() {
+    return typeof Notification !== 'undefined';
+}
+
+function hasConfiguredWebPush() {
+    return Boolean(CONFIG.FEATURES.REAL_PUSH_NOTIFICATIONS);
+}
 
 // Enable notifications for student
 async function enableStudentNotifications() {
     try {
         // Check browser support
-        if (!('Notification' in window)) {
+        if (!hasBrowserNotifications()) {
             alert('This browser does not support notifications');
             return;
         }
 
-        if (!('serviceWorker' in navigator)) {
+        if (hasConfiguredWebPush() && !('serviceWorker' in navigator)) {
             alert('This browser does not support service workers');
             return;
         }
@@ -499,37 +537,22 @@ async function enableStudentNotifications() {
             return;
         }
 
-        // Generate simulated FCM token (in production, use Firebase SDK)
-        studentFCMToken = generateSimulatedFCMToken();
+        updateNotificationStatus(hasConfiguredWebPush() ? 'enabled' : 'browser_only');
+        document.getElementById('enableNotifBtn').style.display = 'none';
 
-        // Register token with backend
-        const response = await fetch(`${API_BASE}/api/register_fcm_token`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ fcm_token: studentFCMToken })
-        });
+        await generateParentPortalLink();
 
-        if (response.ok) {
-            updateNotificationStatus('enabled');
-
-            // Show contact form
-            document.getElementById('contactForm').style.display = 'block';
-            document.getElementById('enableNotifBtn').style.display = 'none';
-
-            // Show parent portal link
-            generateParentPortalLink();
-
-            // Send test notification
-            setTimeout(() => {
-                sendTestNotification('✅ Notifications enabled! You will receive updates about your gate passes.');
-            }, 1000);
-
-        } else {
-            throw new Error('Failed to register for notifications');
+        if (!hasConfiguredWebPush()) {
+            alert('Browser alerts are enabled on this device. Secure parent links and SMS backup still work, but Firebase web push is not configured in this build.');
         }
+
+        // Send test notification
+        setTimeout(() => {
+            const message = hasConfiguredWebPush()
+                ? '✅ Notifications enabled! You will receive updates about your gate passes.'
+                : '✅ Browser alerts enabled on this device. Server push is not configured in this build.';
+            sendTestNotification(message);
+        }, 1000);
 
     } catch (error) {
         console.error('Notification setup error:', error);
@@ -549,28 +572,12 @@ async function saveContactInfo() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/api/update_contact`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                phone: studentPhone,
-                parent_name: parentName,
-                parent_phone: parentPhone
-            })
-        });
+        await NotificationAPI.saveContact(studentPhone, parentName, parentPhone);
 
-        if (response.ok) {
-            alert('✅ Contact information saved! Your parents will now receive notifications when you enter/exit campus.');
+        alert('✅ Contact information saved. Share the secure parent link below to let your parent view activity history. SMS backup can be used if the backend is configured for it.');
 
-            // Update parent portal link with student info
-            generateParentPortalLink();
-
-        } else {
-            throw new Error('Failed to save contact information');
-        }
+        // Update parent portal link with student info
+        generateParentPortalLink();
 
     } catch (error) {
         console.error('Save contact error:', error);
@@ -579,16 +586,22 @@ async function saveContactInfo() {
 }
 
 // Generate parent portal link
-function generateParentPortalLink() {
-    if (currentUser) {
+async function generateParentPortalLink() {
+    if (!currentUser || !currentUser.student_id) {
+        return;
+    }
+
+    try {
+        const access = await ParentAPI.getAccessToken();
         const baseUrl = window.location.origin;
-        // Make sure to include index.html in the URL
-        const parentUrl = `${baseUrl}/frontend/parent/index.html?student_id=${encodeURIComponent(currentUser.student_id || '')}&student_name=${encodeURIComponent(currentUser.name || '')}`;
+        const parentUrl = `${baseUrl}/frontend/parent/index.html?student_id=${encodeURIComponent(currentUser.student_id || '')}&student_name=${encodeURIComponent(currentUser.name || '')}&access_token=${encodeURIComponent(access.access_token || '')}`;
 
         document.getElementById('parentLinkInput').value = parentUrl;
         document.getElementById('parentPortalLink').style.display = 'block';
 
         console.log('Generated parent portal link:', parentUrl);
+    } catch (error) {
+        console.error('Failed to generate parent portal link:', error);
     }
 }
 
@@ -600,7 +613,7 @@ function copyParentLink() {
 
     try {
         document.execCommand('copy');
-        alert('✅ Link copied! Share this with your parent to setup their notifications.');
+        alert('✅ Link copied. Share this with your parent to open the secure activity portal.');
     } catch (err) {
         alert('Failed to copy link. Please copy it manually.');
     }
@@ -617,29 +630,33 @@ function updateNotificationStatus(status) {
                 <p style="margin:5px 0 0 0; font-size:14px; opacity:0.9;">You will receive alerts when your passes are approved/rejected</p>
             </div>
         `;
+    } else if (status === 'browser_only') {
+        statusDiv.innerHTML = `
+            <div style="padding:15px; background:rgba(255,255,255,0.2); border-radius:12px; backdrop-filter:blur(10px);">
+                <p style="margin:0; font-weight:600;">✅ Browser Alerts Enabled</p>
+                <p style="margin:5px 0 0 0; font-size:14px; opacity:0.9;">Alerts work on this device only. Real web push is not configured in this build.</p>
+            </div>
+        `;
     } else if (status === 'disabled') {
         statusDiv.innerHTML = `
             <div style="padding:15px; background:rgba(255,255,255,0.2); border-radius:12px; backdrop-filter:blur(10px);">
                 <p style="margin:0; font-weight:600;">🔕 Notifications Disabled</p>
-                <p style="margin:5px 0 0 0; font-size:14px; opacity:0.9;">Enable notifications to get instant updates</p>
+                <p style="margin:5px 0 0 0; font-size:14px; opacity:0.9;">Enable browser alerts on this device. Secure parent links work without this step.</p>
+            </div>
+        `;
+    } else if (status === 'unsupported') {
+        statusDiv.innerHTML = `
+            <div style="padding:15px; background:rgba(255,255,255,0.2); border-radius:12px; backdrop-filter:blur(10px);">
+                <p style="margin:0; font-weight:600;">ℹ️ Browser Alerts Unavailable</p>
+                <p style="margin:5px 0 0 0; font-size:14px; opacity:0.9;">This device does not support browser notifications. Contact details and the parent portal still work.</p>
             </div>
         `;
     }
 }
 
-// Generate simulated FCM token
-function generateSimulatedFCMToken() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-    let token = '';
-    for (let i = 0; i < 152; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
-}
-
 // Send test notification
 function sendTestNotification(message) {
-    if (Notification.permission === 'granted') {
+    if (hasBrowserNotifications() && Notification.permission === 'granted') {
         const notification = new Notification('🎓 Campus GatePass', {
             body: message,
             icon: '/icon-192x192.png',
@@ -685,12 +702,19 @@ function initializeNotificationCard() {
         console.log('Parent Name:', currentUser.parent_name || 'Not set');
         console.log('Parent Phone:', currentUser.parent_phone || 'Not set');
 
-        // Check if notifications are already enabled
-        if (Notification.permission === 'granted') {
-            updateNotificationStatus('enabled');
-            document.getElementById('contactForm').style.display = 'block';
+        document.getElementById('contactForm').style.display = 'block';
+        generateParentPortalLink();
+
+        if (!hasBrowserNotifications()) {
+            updateNotificationStatus('unsupported');
             document.getElementById('enableNotifBtn').style.display = 'none';
-            generateParentPortalLink();
+            return;
+        }
+
+        // Check if notifications are already enabled
+        if (hasBrowserNotifications() && Notification.permission === 'granted') {
+            updateNotificationStatus(hasConfiguredWebPush() ? 'enabled' : 'browser_only');
+            document.getElementById('enableNotifBtn').style.display = 'none';
         } else {
             updateNotificationStatus('disabled');
         }
@@ -701,14 +725,14 @@ function initializeNotificationCard() {
 // EMERGENCY EXIT FEATURE
 // ============================================================================
 
-async function requestEmergencyExit() {
+async function requestEmergencyExit(buttonEl) {
     // Confirmation dialog with reason input
     const confirmed = confirm(
         "🚨 EMERGENCY EXIT REQUEST\n\n" +
         "Are you sure you need to leave campus immediately?\n\n" +
         "This will:\n" +
         "• Grant you instant exit permission\n" +
-        "• Notify all administrators\n" +
+        "• Notify all Access Control Administrators\n" +
         "• Create an emergency log entry\n\n" +
         "Click OK to proceed with emergency exit."
     );
@@ -731,40 +755,25 @@ async function requestEmergencyExit() {
 
     try {
         // Show loading
-        const originalBtn = event.target;
+        const originalBtn = buttonEl;
         originalBtn.disabled = true;
         originalBtn.textContent = '⏳ Processing Emergency Exit...';
 
-        const response = await fetch(`${API_BASE}/api/emergency_exit`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                reason: reason.trim()
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Emergency exit request failed');
-        }
-
-        const data = await response.json();
+        const data = await PassAPI.emergencyExit(reason.trim());
 
         // Show success message
         alert(
             "✅ EMERGENCY EXIT GRANTED\n\n" +
             `Time: ${new Date().toLocaleTimeString()}\n` +
-            `Student: ${data.student_name}\n` +
+            `Personnel: ${data.student_name}\n` +
             `ID: ${data.student_id}\n\n` +
             "You may now leave campus immediately.\n" +
-            "Admins have been notified.\n\n" +
+            "Access Control Administrators have been notified.\n\n" +
             "Stay safe!"
         );
 
         // Show success notification
-        if (Notification.permission === 'granted') {
+        if (hasBrowserNotifications() && Notification.permission === 'granted') {
             new Notification('🚨 Emergency Exit Granted', {
                 body: 'You may now leave campus. Stay safe!',
                 icon: '/icon-192x192.png',
@@ -775,7 +784,7 @@ async function requestEmergencyExit() {
 
         // Reset button
         originalBtn.disabled = false;
-        originalBtn.textContent = '🚨 Request Emergency Exit';
+        originalBtn.textContent = '🚨 Request Emergency Exit Now';
 
         // Optionally reload passes to show the emergency exit log
         setTimeout(() => {
@@ -792,10 +801,11 @@ async function requestEmergencyExit() {
         );
 
         // Reset button
-        if (event && event.target) {
-            event.target.disabled = false;
-            event.target.textContent = '🚨 Request Emergency Exit';
+        if (buttonEl) {
+            buttonEl.disabled = false;
+            buttonEl.textContent = '🚨 Request Emergency Exit Now';
         }
     }
 }
 
+updateAuthAvailability();

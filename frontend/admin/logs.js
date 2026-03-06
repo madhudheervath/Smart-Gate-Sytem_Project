@@ -3,22 +3,94 @@
  * WebSocket + Chart.js + Live Updates
  */
 
-const API_BASE = CONFIG.API_BASE;
-const WS_BASE = CONFIG.API_BASE.replace('http', 'ws');
-
-let authToken = localStorage.getItem('token');
+let authToken = localStorage.getItem('adminToken');
 let currentUser = null;
 let dailyChart = null;
 let hourlyChart = null;
 let ws = null;
 let allLogs = [];
+let wsPingInterval = null;
+const apiClient = CONFIG.createApiClient();
+let chartRefreshTimeout = null;
+
+async function apiFetch(path, options = {}) {
+    return apiClient.fetch(path, options);
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function badgeClassForResult(result) {
+    const normalized = String(result || '').toLowerCase();
+    if (normalized === 'success') return 'success';
+    if (normalized === 'expired' || normalized === 'invalid') return normalized;
+    if (normalized === 'not-approved' || normalized === 'replay' || normalized === 'error') return 'warning';
+    if (normalized === 'used') return 'info';
+    return 'neutral';
+}
+
+function getResultLabel(result) {
+    return String(result || '').replaceAll('-', ' ').toUpperCase();
+}
+
+function normalizeLog(log) {
+    return {
+        ...log,
+        student_id: log.student_id || 'Unknown',
+        student_name: log.student_name || 'Unknown',
+        scan_type: log.scan_type || 'entry',
+        result: log.result || 'unknown',
+        gate: log.gate || (log.emergency ? 'Emergency Exit' : 'Main Gate'),
+        details: log.details || '',
+        time: log.time || '',
+        date: log.date || '',
+        timestamp: log.timestamp || '',
+        emergency: Boolean(log.emergency),
+    };
+}
+
+async function ensureAdminSession() {
+    const token = localStorage.getItem('adminToken');
+    if (!token) {
+        window.location.href = 'index.html';
+        return false;
+    }
+
+    const response = await apiFetch('/auth/me', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        localStorage.removeItem('adminToken');
+        window.location.href = 'index.html';
+        return false;
+    }
+
+    const user = await response.json();
+    if (user.role !== 'admin') {
+        localStorage.removeItem('adminToken');
+        window.location.href = 'index.html';
+        return false;
+    }
+
+    currentUser = user;
+    return true;
+}
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async function () {
     console.log('📊 Initializing Real-Time Logs Dashboard...');
 
     // Always try to get the latest token
-    authToken = localStorage.getItem('token');
+    authToken = localStorage.getItem('adminToken');
     console.log('Token check:', authToken ? 'Found (length: ' + authToken.length + ')' : 'Not found');
 
     // Load dashboard components regardless
@@ -26,10 +98,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     console.log('Loading dashboard components...');
 
     try {
-        loadStatistics();
-        loadDailyChart();
-        loadHourlyChart();
-        loadRecentLogs();
+        const hasAdminSession = await ensureAdminSession();
+        if (!hasAdminSession) {
+            return;
+        }
+
+        await loadStatistics();
+        await loadDailyChart();
+        await loadHourlyChart();
+        await loadRecentLogs();
         connectWebSocket();
 
         // Auto-refresh statistics every 30 seconds
@@ -48,8 +125,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 async function loadStatistics() {
     try {
         // Always get fresh token
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/api/logs/statistics?days=7`, {
+        const token = localStorage.getItem('adminToken');
+        const response = await apiFetch('/api/logs/statistics?days=7', {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -65,8 +142,8 @@ async function loadStatistics() {
         document.getElementById('studentsInCampus').textContent = stats.students_in_campus;
         document.getElementById('totalScans').textContent = stats.total_scans;
         document.getElementById('successRate').textContent = `${stats.success_rate}% success rate`;
-        document.getElementById('entriesToday').textContent = stats.entries;
-        document.getElementById('exitsToday').textContent = stats.exits;
+        document.getElementById('entriesToday').textContent = stats.entries_today ?? stats.entries;
+        document.getElementById('exitsToday').textContent = stats.exits_today ?? stats.exits;
 
         console.log('✅ Statistics loaded:', stats);
     } catch (error) {
@@ -86,8 +163,8 @@ async function loadStatistics() {
 
 async function loadDailyChart() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/api/logs/daily?days=7`, {
+        const token = localStorage.getItem('adminToken');
+        const response = await apiFetch('/api/logs/daily?days=7', {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -155,8 +232,8 @@ async function loadDailyChart() {
 
 async function loadHourlyChart() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/api/logs/hourly`, {
+        const token = localStorage.getItem('adminToken');
+        const response = await apiFetch('/api/logs/hourly', {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -230,8 +307,8 @@ async function loadHourlyChart() {
 
 async function loadRecentLogs() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/api/logs/recent?limit=100`, {
+        const token = localStorage.getItem('adminToken');
+        const response = await apiFetch('/api/logs/recent?limit=100', {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -240,7 +317,7 @@ async function loadRecentLogs() {
         if (!response.ok) throw new Error('Failed to load logs');
 
         const data = await response.json();
-        allLogs = data.logs || [];
+        allLogs = (data.logs || []).map(normalizeLog);
 
         renderLogs(allLogs);
 
@@ -259,31 +336,34 @@ function renderLogs(logs) {
         return;
     }
 
-    tbody.innerHTML = logs.map(log => `
+    tbody.innerHTML = logs.map((rawLog) => {
+        const log = normalizeLog(rawLog);
+        return `
         <tr ${log.emergency ? 'style="background: #fff5f5; border-left: 4px solid #dc3545;"' : ''}>
             <td>
-                <div style="font-weight: 600;">${log.time}</div>
-                <div style="font-size: 12px; color: #6b7280;">${log.date}</div>
+                <div style="font-weight: 600;">${escapeHtml(log.time)}</div>
+                <div style="font-size: 12px; color: #6b7280;">${escapeHtml(log.date)}</div>
                 ${log.emergency ? '<div style="font-size: 11px; color: #dc3545; font-weight: 700; margin-top: 4px;">🚨 EMERGENCY</div>' : ''}
             </td>
-            <td><strong>${log.student_id}</strong></td>
-            <td>${log.student_name}</td>
+            <td><strong>${escapeHtml(log.student_id)}</strong></td>
+            <td>${escapeHtml(log.student_name)}</td>
             <td>
                 <span class="badge ${log.scan_type}" ${log.emergency ? 'style="background: #dc3545; color: white;"' : ''}>
                     ${log.emergency ? '🚨 ' : ''}${log.scan_type === 'entry' ? '🟢 Entry' : '🔴 Exit'}
                 </span>
             </td>
             <td>
-                <span class="badge ${log.result}">
-                    ${log.result}
+                <span class="badge ${badgeClassForResult(log.result)}">
+                    ${escapeHtml(getResultLabel(log.result))}
                 </span>
             </td>
-            <td>${log.gate}</td>
+            <td>${escapeHtml(log.gate)}</td>
             <td style="font-size: 12px; color: #6b7280;">
-                ${log.details || '-'}
+                ${escapeHtml(log.details || '-')}
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function showEmptyState(message) {
@@ -304,7 +384,12 @@ function showEmptyState(message) {
 
 function connectWebSocket() {
     try {
-        ws = new WebSocket(`${WS_BASE}/ws/logs`);
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            throw new Error('Missing admin token');
+        }
+
+        ws = new WebSocket(`${apiClient.getWsBase()}/ws/logs?token=${encodeURIComponent(token)}`);
 
         ws.onopen = () => {
             console.log('✅ WebSocket connected - Real-time updates active');
@@ -316,6 +401,8 @@ function connectWebSocket() {
 
                 if (message.type === 'initial') {
                     console.log('📦 Received initial data');
+                    allLogs = Array.isArray(message.data) ? message.data.map(normalizeLog) : [];
+                    renderLogs(allLogs);
                 } else if (message.type === 'new_scan') {
                     console.log('🔔 New scan received:', message.data);
                     handleNewScan(message.data);
@@ -334,8 +421,12 @@ function connectWebSocket() {
             setTimeout(connectWebSocket, 5000);
         };
 
+        if (wsPingInterval) {
+            clearInterval(wsPingInterval);
+        }
+
         // Send ping every 30 seconds to keep connection alive
-        setInterval(() => {
+        wsPingInterval = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send('ping');
             }
@@ -348,7 +439,7 @@ function connectWebSocket() {
 
 function handleNewScan(scanData) {
     // Add to beginning of logs array
-    allLogs.unshift(scanData);
+    allLogs.unshift(normalizeLog(scanData));
 
     // Keep only last 100 logs in memory
     if (allLogs.length > 100) {
@@ -360,6 +451,7 @@ function handleNewScan(scanData) {
 
     // Update statistics
     loadStatistics();
+    refreshChartsSoon();
 
     // Show notification (optional)
     showNotification(scanData);
@@ -368,6 +460,17 @@ function handleNewScan(scanData) {
 function showNotification(scanData) {
     // You can add a toast notification here if desired
     console.log(`🔔 ${scanData.student_name} ${scanData.scan_type === 'entry' ? 'entered' : 'exited'} campus`);
+}
+
+function refreshChartsSoon() {
+    if (chartRefreshTimeout) {
+        clearTimeout(chartRefreshTimeout);
+    }
+
+    chartRefreshTimeout = setTimeout(() => {
+        loadDailyChart();
+        loadHourlyChart();
+    }, 400);
 }
 
 // ============================================================================
@@ -382,7 +485,7 @@ async function applyFilters() {
     const dateTo = document.getElementById('filterDateTo').value;
 
     try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('adminToken');
         const params = new URLSearchParams();
         if (studentId) params.append('student_id', studentId);
         if (scanType) params.append('scan_type', scanType);
@@ -390,7 +493,7 @@ async function applyFilters() {
         if (dateFrom) params.append('date_from', `${dateFrom}T00:00:00`);
         if (dateTo) params.append('date_to', `${dateTo}T23:59:59`);
 
-        const response = await fetch(`${API_BASE}/api/logs/search?${params}`, {
+        const response = await apiFetch(`/api/logs/search?${params}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -399,7 +502,7 @@ async function applyFilters() {
         if (!response.ok) throw new Error('Search failed');
 
         const data = await response.json();
-        allLogs = data.logs || [];
+        allLogs = (data.logs || []).map(normalizeLog);
 
         renderLogs(allLogs);
 
@@ -432,15 +535,18 @@ function exportLogs() {
 
     // Create CSV content
     const headers = ['Timestamp', 'Student ID', 'Student Name', 'Type', 'Result', 'Gate', 'Details'];
-    const rows = allLogs.map(log => [
-        log.timestamp,
-        log.student_id,
-        log.student_name,
-        log.scan_type,
-        log.result,
-        log.gate,
-        log.details || ''
-    ]);
+    const rows = allLogs.map(rawLog => {
+        const log = normalizeLog(rawLog);
+        return [
+            log.timestamp,
+            log.student_id,
+            log.student_name,
+            log.scan_type,
+            log.result,
+            log.gate,
+            log.details || ''
+        ];
+    });
 
     const csvContent = [
         headers.join(','),

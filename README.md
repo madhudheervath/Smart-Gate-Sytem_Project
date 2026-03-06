@@ -28,7 +28,7 @@ The **Smart Gate System** replaces traditional paper-based gate passes with a se
 - ✅ **Digital QR Codes** - HMAC-signed, time-limited passes
 - ✅ **Face Recognition** - 128-D encoding with 99.38% accuracy
 - ✅ **GPS Geofencing** - Location-based access control
-- ✅ **Real-Time Notifications** - FCM push + SMS alerts
+- ✅ **Notifications & Parent Access** - Browser alerts, SMS backup, secure parent portal links
 - ✅ **Multi-Portal Architecture** - Student, Admin, Guard, Parent interfaces
 - ✅ **Admin Location Control** - Configure campus via web UI
 
@@ -73,7 +73,7 @@ The **Smart Gate System** replaces traditional paper-based gate passes with a se
 - **Student**: Request passes, generate QR, daily entry
 - **Admin**: Approve passes, analytics, location config
 - **Guard**: Scan QR, verify faces
-- **Parent**: View activity (no login needed)
+- **Parent**: View activity with a signed link (no separate login)
 
 ### 2. **GPS Geofencing**
 
@@ -109,9 +109,9 @@ The **Smart Gate System** replaces traditional paper-based gate passes with a se
 
 ### 4. **Notifications**
 
-- **Firebase Cloud Messaging**: Push notifications
-- **Twilio SMS**: Text alerts
-- **Parent Portal**: Real-time updates
+- **Browser Alerts**: Local browser notifications on the current device
+- **Twilio SMS**: Text alerts when backend credentials are configured
+- **Parent Portal**: Signed-link access to recent student activity
 - **Events**: Approval, rejection, entry/exit, expiry
 
 ### 5. **Analytics**
@@ -184,9 +184,11 @@ pip install -r requirements.txt
 #### 3. Initialize Database
 
 ```bash
-python init_db.py
+python bootstrap.py
 python add_students_with_parents.py
 ```
+
+Tables are created automatically by the backend and bootstrap flow using SQLAlchemy metadata. Alembic is included for a safe baseline migration. Demo users are seeded only when the database is empty by default.
 
 ---
 
@@ -208,6 +210,7 @@ DB_URL=sqlite:///./gatepass.db
 # Token Expiry
 ACCESS_TOKEN_EXPIRE_MINUTES=720
 QR_TTL_MINUTES=15
+SMARTGATE_SEED_MODE=if_empty
 
 # Firebase (optional)
 FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
@@ -311,7 +314,7 @@ Password: guard123 / scanner123
 ```bash
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=student1@uni.edu&password=s123456"
+  -d "username=u22cn361@cmrtc.ac.in&password=madhavi123"
 ```
 
 Response:
@@ -319,7 +322,7 @@ Response:
 {
   "access_token": "eyJhbGci...",
   "token_type": "bearer",
-  "name": "Student One",
+  "name": "Madhavi",
   "role": "student"
 }
 ```
@@ -352,25 +355,24 @@ curl -X POST http://localhost:8080/passes/1/approve \
 ```bash
 curl -X POST http://localhost:8080/verify \
   -H "Authorization: Bearer <guard_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"token":"1.5.1697789234.a3f2b8c9d4e5..."}'
+  -F "token=1.5.1697789234.a3f2b8c9d4e5..."
 ```
 
 ### Face Recognition
 
-#### POST /face/register
+#### POST /api/register_face
 ```bash
-curl -X POST http://localhost:8080/face/register \
+curl -X POST http://localhost:8080/api/register_face \
   -H "Authorization: Bearer <token>" \
   -F "file=@photo.jpg"
 ```
 
-#### POST /face/verify
+#### POST /api/verify_face
 ```bash
-curl -X POST http://localhost:8080/face/verify \
+curl -X POST http://localhost:8080/api/verify_face \
   -H "Authorization: Bearer <guard_token>" \
   -F "file=@live_photo.jpg" \
-  -F "student_id=U22CN361"
+  -F "student_id=2"
 ```
 
 ### Location Settings
@@ -397,9 +399,9 @@ curl -X POST http://localhost:8080/api/admin/location \
 
 ### Daily Entry
 
-#### POST /daily-entry
+#### POST /passes/daily-entry
 ```bash
-curl -X POST http://localhost:8080/daily-entry \
+curl -X POST http://localhost:8080/passes/daily-entry \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -407,6 +409,19 @@ curl -X POST http://localhost:8080/daily-entry \
     "longitude":77.0144,
     "pass_type":"entry"
   }'
+```
+
+### Parent Portal
+
+#### GET /api/parent/access-token
+```bash
+curl http://localhost:8080/api/parent/access-token \
+  -H "Authorization: Bearer <student_token>"
+```
+
+#### GET /api/parent/student_history/{student_id}?access_token=...
+```bash
+curl "http://localhost:8080/api/parent/student_history/U22CN361?access_token=<signed_parent_token>"
 ```
 
 **Full API Docs:** http://localhost:8080/docs
@@ -531,7 +546,7 @@ SELECT * FROM users;
 ```bash
 # 1. Student login
 TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
-  -d "username=student1@uni.edu&password=s123456" | jq -r .access_token)
+  -d "username=u22cn361@cmrtc.ac.in&password=madhavi123" | jq -r .access_token)
 
 # 2. Create pass
 PASS_ID=$(curl -s -X POST http://localhost:8080/passes \
@@ -546,7 +561,7 @@ curl -X POST http://localhost:8080/passes/$PASS_ID/approve \
 # 4. Verify QR (use guard token)
 curl -X POST http://localhost:8080/verify \
   -H "Authorization: Bearer <guard_token>" \
-  -d '{"token":"..."}'
+  -F "token=..."
 ```
 
 ### Test Scenarios
@@ -600,10 +615,10 @@ pip install --no-cache-dir dlib
 - Verify geofencing is enabled
 
 #### **Notifications not received**
-- Check Firebase credentials
-- Verify FCM token registration
-- Test token in Firebase console
-- Check browser notification permissions
+- Check browser notification permissions first
+- Real web push is disabled by default in this repository
+- SMS delivery requires valid Twilio credentials on the backend
+- Parent activity history still works through the signed parent link
 
 #### **"Forbidden" error on location page**
 - You must login as **admin** (not student)
@@ -629,9 +644,10 @@ smart Gate/
 │   ├── settings.py               # Configuration
 │   ├── geofence.py              # GPS geofencing
 │   ├── location_settings.py     # Location management
-│   ├── notifications.py         # FCM notifications
+│   ├── notifications_v2.py      # Firebase Admin / SMS notification backend
 │   ├── face_recognition_api.py  # Face recognition
-│   ├── init_db.py               # Database initialization
+│   ├── alembic/                 # Safe schema migration baseline
+│   ├── bootstrap.py             # DB bootstrap + optional demo seed
 │   ├── seed.py                  # Seed demo data
 │   ├── add_students_with_parents.py
 │   ├── requirements.txt         # Python dependencies
@@ -701,8 +717,8 @@ smart Gate/
    - Admin configurable locations
 
 5. **Notification System**
-   - Firebase Cloud Messaging (FCM)
-   - Browser push notifications
+   - Browser alerts
+   - Optional Firebase Cloud Messaging (requires real web config)
    - Parent portal updates
    - Twilio SMS integration (optional)
    - Real-time event notifications
@@ -820,8 +836,8 @@ WantedBy=multi-user.target
 - Generate daily entry QR codes
 - View pass history
 - Register face (one-time)
-- Enable push notifications
-- Share parent portal link
+- Enable browser alerts on the current device
+- Share a secure parent portal link
 
 ### For Admins
 - Approve/reject pass requests
@@ -840,11 +856,11 @@ WantedBy=multi-user.target
 - Entry/Exit mode toggle
 
 ### For Parents
-- View child's activity
-- Receive entry/exit notifications
-- Enable SMS alerts
+- View child's activity through a signed link
+- Receive SMS alerts if the backend is configured
+- Enable browser alerts on the current device
 - Track movement history
-- No login required (Student ID-based)
+- No separate login required
 
 ---
 
@@ -867,30 +883,26 @@ WantedBy=multi-user.target
 - `check_installation.py` - Verify installation
 
 ### Database Scripts
-- `init_db.py` - Initialize database
-- `seed.py` - Add demo users
+- `bootstrap.py` - Create tables and seed demo users when needed
+- `seed.py` - Force demo user seed/update
 - `add_students_with_parents.py` - Add students
 
 ---
 
 ## 🎉 Summary
 
-This Smart Gate System is a **complete, production-ready** campus management solution featuring:
+This Smart Gate System is a **working campus access prototype** featuring:
 
 ✅ **4 Different Portals** - Student, Admin, Guard, Parent  
 ✅ **3 Authentication Methods** - Password, QR Code, Face  
 ✅ **GPS Geofencing** - Location-based access  
-✅ **Real-Time Notifications** - FCM + SMS  
+✅ **Notifications & Parent Access** - Browser alerts, secure links, optional SMS/FCM  
 ✅ **Admin Configuration** - No code changes needed  
 ✅ **Comprehensive Logging** - Full audit trail  
 ✅ **Beautiful UI** - Modern, responsive design  
 ✅ **Security First** - HMAC, JWT, Bcrypt, HTTPS  
 ✅ **Easy Setup** - One-click installation script  
 ✅ **Complete Documentation** - This README + guides  
-
-**Built with ❤️ for modern campus security**
-
----
 
 ## 📜 License
 
@@ -913,9 +925,9 @@ This project was built and documented comprehensively to serve as a complete cam
 ---
 
 **Version:** 2.2  
-**Last Updated:** October 25, 2025  
-**Status:** ✅ Production Ready
+**Last Updated:** March 6, 2026  
+**Status:** Prototype / needs production hardening
 
 ---
 
-**🎓 Ready to deploy! Follow the installation guide and you're all set!**
+**Review the implementation details before any production deployment.**

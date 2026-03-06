@@ -1,14 +1,21 @@
 from pydantic_settings import BaseSettings
 
 from pydantic import field_validator
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_DB_URL = f"sqlite:///{(BASE_DIR / 'gatepass.db').resolve()}"
 
 class Settings(BaseSettings):
     SECRET_KEY: str = "change_me_32+_random_secret_key_here"
     JWT_SECRET: str = "change_me_jwt_secret_key_here"
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 12
-    DB_URL: str = "sqlite:///./gatepass.db"
+    PARENT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
+    DB_URL: str = DEFAULT_DB_URL
     QR_TTL_MINUTES: int = 15
+    SELF_REGISTRATION_ENABLED: bool = False
+    ACCOUNT_REQUESTS_ENABLED: bool = True
 
     @field_validator("DB_URL")
     @classmethod

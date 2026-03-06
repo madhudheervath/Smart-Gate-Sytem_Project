@@ -1,11 +1,23 @@
 /**
  * Parent Notification Portal JavaScript
- * Handles Firebase FCM registration for parents
+ * Handles secure parent linking and optional browser alerts
  */
 
-const API_BASE = CONFIG.API_BASE;
 let currentStudent = null;
-let fcmToken = null;
+let parentAccessToken = null;
+const apiClient = CONFIG.createApiClient();
+
+async function apiFetch(path, options = {}) {
+    return apiClient.fetch(path, options);
+}
+
+function hasBrowserNotifications() {
+    return typeof Notification !== 'undefined';
+}
+
+function hasConfiguredWebPush() {
+    return Boolean(CONFIG.FEATURES.REAL_PUSH_NOTIFICATIONS);
+}
 
 // Navigation between steps
 function showStep(stepId) {
@@ -57,26 +69,42 @@ async function validateStudent() {
         return;
     }
 
-    // For now, we'll simulate student validation
-    // In production, you'd verify against the database
-    currentStudent = {
-        id: studentId,
-        name: studentName,
-        parentName: parentName,
-        parentPhone: parentPhone
-    };
+    if (!parentAccessToken) {
+        alert('This page requires the secure link generated from the student portal.');
+        return;
+    }
 
-    // Show student info
-    document.getElementById('studentInfo').innerHTML = `
-        <h4>📋 Student Information</h4>
-        <p><strong>Student ID:</strong> ${studentId}</p>
-        <p><strong>Student Name:</strong> ${studentName}</p>
-        <p><strong>Parent Name:</strong> ${parentName}</p>
-        ${parentPhone ? `<p><strong>Phone:</strong> ${parentPhone}</p>` : ''}
-        <p style="margin-top: 15px; color: #28a745;">✅ Ready to setup notifications</p>
-    `;
+    try {
+        const response = await apiFetch(`/api/parent/student_history/${encodeURIComponent(studentId)}?access_token=${encodeURIComponent(parentAccessToken)}`);
 
-    showStep('step2');
+        if (!response.ok) {
+            throw new Error('Invalid or expired parent access link');
+        }
+
+        const data = await response.json();
+
+        currentStudent = {
+            id: studentId,
+            name: data.student_name || studentName,
+            parentName: parentName,
+            parentPhone: parentPhone,
+            accessToken: parentAccessToken
+        };
+
+        document.getElementById('studentInfo').innerHTML = `
+            <h4>📋 Student Information</h4>
+            <p><strong>Student ID:</strong> ${studentId}</p>
+            <p><strong>Student Name:</strong> ${currentStudent.name}</p>
+            <p><strong>Parent Name:</strong> ${parentName}</p>
+            ${parentPhone ? `<p><strong>Phone:</strong> ${parentPhone}</p>` : ''}
+            <p style="margin-top: 15px; color: #28a745;">✅ Access link verified</p>
+        `;
+
+        showStep('step2');
+    } catch (error) {
+        console.error('Student validation failed:', error);
+        alert(error.message || 'Unable to verify the student. Use the secure link from the student portal.');
+    }
 }
 
 // Step 2: Enable notifications
@@ -84,56 +112,45 @@ async function enableNotifications() {
     showStep('step3');
 
     try {
-        // Step 1: Check browser support
-        updateProgress('permissionStatus', '⏳ Checking browser support...', 'waiting');
+        const browserNotificationsSupported = hasBrowserNotifications();
 
-        if (!('Notification' in window)) {
-            throw new Error('This browser does not support notifications');
+        if (browserNotificationsSupported) {
+            updateProgress('permissionStatus', '⏳ Requesting browser permission...', 'waiting');
+
+            if (hasConfiguredWebPush() && !('serviceWorker' in navigator)) {
+                throw new Error('This browser does not support service workers required for web push');
+            }
+
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                updateProgress('permissionStatus', '✅ Browser alerts allowed', 'success');
+                const registrationText = hasConfiguredWebPush()
+                    ? '✅ Push notifications configured'
+                    : '✅ Browser alerts enabled on this device';
+                updateProgress('registrationStatus', registrationText, 'success');
+            } else {
+                updateProgress('permissionStatus', 'ℹ️ Browser alerts skipped', 'success');
+                updateProgress('registrationStatus', 'ℹ️ Continuing without browser alerts', 'success');
+            }
+        } else {
+            updateProgress('permissionStatus', 'ℹ️ Browser alerts are not supported on this device', 'success');
+            updateProgress('registrationStatus', 'ℹ️ Continuing with secure history access only', 'success');
         }
-
-        if (!('serviceWorker' in navigator)) {
-            throw new Error('This browser does not support service workers');
-        }
-
-        updateProgress('permissionStatus', '✅ Browser supported', 'success');
-
-        // Step 2: Request permission
-        updateProgress('permissionStatus', '⏳ Requesting permission...', 'waiting');
-
-        const permission = await Notification.requestPermission();
-
-        if (permission !== 'granted') {
-            throw new Error('Notification permission denied. Please enable notifications in your browser settings.');
-        }
-
-        updateProgress('permissionStatus', '✅ Permission granted', 'success');
-
-        // Step 3: Register device (simulate FCM token)
-        updateProgress('registrationStatus', '⏳ Registering device...', 'waiting');
-
-        // In production, you'd get a real FCM token here
-        // For now, we'll simulate it
-        fcmToken = generateSimulatedFCMToken();
-
-        // Simulate delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        updateProgress('registrationStatus', '✅ Device registered', 'success');
 
         // Step 4: Link to student
-        updateProgress('linkStatus', '⏳ Linking to student...', 'waiting');
+        updateProgress('linkStatus', '⏳ Linking parent contact...', 'waiting');
 
         const success = await linkParentToStudent();
 
         if (success) {
-            updateProgress('linkStatus', '✅ Successfully linked', 'success');
+            updateProgress('linkStatus', '✅ Parent contact linked', 'success');
 
             // Show success
             setTimeout(() => {
                 showSuccessPage();
-            }, 1000);
+            }, 500);
         } else {
-            throw new Error('Failed to link parent to student');
+            throw new Error('Failed to link parent contact to the student');
         }
 
     } catch (error) {
@@ -157,50 +174,49 @@ function updateProgress(elementId, text, status) {
     }
 }
 
-function generateSimulatedFCMToken() {
-    // Generate a realistic-looking FCM token for testing
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-    let token = '';
-    for (let i = 0; i < 152; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
-}
-
 async function linkParentToStudent() {
     try {
-        // In production, this would:
-        // 1. Find the student in the database
-        // 2. Update their parent_fcm_token field
-        // 3. Save parent contact info
+        const payload = {
+            student_id: currentStudent.id,
+            parent_name: currentStudent.parentName,
+            parent_phone: currentStudent.parentPhone,
+            access_token: currentStudent.accessToken
+        };
 
-        // For now, we'll simulate the API call
-        const response = await fetch(`${API_BASE}/api/register_parent_fcm`, {
+        const response = await apiFetch('/api/register_parent_fcm', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                student_id: currentStudent.id,
-                parent_name: currentStudent.parentName,
-                parent_phone: currentStudent.parentPhone,
-                parent_fcm_token: fcmToken
-            })
+            body: JSON.stringify(payload)
         });
 
-        // For demo purposes, we'll assume success even if API doesn't exist yet
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to register parent notifications');
+        }
+
         return true;
 
     } catch (error) {
         console.error('API call failed:', error);
-        // For demo, still return true
-        return true;
+        return false;
     }
 }
 
 function showSuccessPage() {
     // Update the success message
     document.getElementById('successStudentName').textContent = currentStudent.name;
+    const setupNote = document.getElementById('successSetupNote');
+    if (setupNote) {
+        if (hasBrowserNotifications() && Notification.permission === 'granted') {
+            setupNote.textContent = hasConfiguredWebPush()
+                ? 'Web push is configured for this device.'
+                : 'Browser alerts are enabled on this device only. Server push is not configured in this build.';
+        } else {
+            setupNote.textContent = 'Parent contact details are linked. Use this page to review recent entry and exit history.';
+        }
+    }
 
     showStep('success');
 
@@ -216,7 +232,7 @@ async function loadLastStatus() {
         document.getElementById('lastStatusDisplay').style.display = 'none';
         document.getElementById('lastStatusEmpty').style.display = 'none';
 
-        const response = await fetch(`${API_BASE}/api/parent/student_history/${currentStudent.id}`);
+        const response = await apiFetch(`/api/parent/student_history/${currentStudent.id}?access_token=${encodeURIComponent(currentStudent.accessToken)}`);
 
         if (!response.ok) {
             throw new Error('Failed to load status');
@@ -282,7 +298,7 @@ async function loadStudentHistory() {
         document.getElementById('historyList').innerHTML = '';
         document.getElementById('historyEmpty').style.display = 'none';
 
-        const response = await fetch(`${API_BASE}/api/parent/student_history/${currentStudent.id}`);
+        const response = await apiFetch(`/api/parent/student_history/${currentStudent.id}?access_token=${encodeURIComponent(currentStudent.accessToken)}`);
 
         if (!response.ok) {
             throw new Error('Failed to load history');
@@ -340,7 +356,7 @@ function showErrorPage(message) {
 async function testNotification() {
     try {
         // Show a test notification
-        if (Notification.permission === 'granted') {
+        if (hasBrowserNotifications() && Notification.permission === 'granted') {
             const notification = new Notification('🟢 Campus GatePass', {
                 body: `${currentStudent.name} entered campus at ${new Date().toLocaleTimeString()}`,
                 icon: '/icon-192x192.png',
@@ -360,7 +376,7 @@ async function testNotification() {
 
             alert('✅ Test notification sent! Check your notifications.');
         } else {
-            alert('❌ Notifications not enabled');
+            alert('❌ Browser alerts are not enabled on this device');
         }
     } catch (error) {
         console.error('Test notification error:', error);
@@ -376,8 +392,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
     const studentId = urlParams.get('student_id');
     const studentName = urlParams.get('student_name');
+    parentAccessToken = urlParams.get('access_token');
 
-    console.log('URL params:', { studentId, studentName });
+    console.log('URL params:', { studentId, studentName, hasAccessToken: !!parentAccessToken });
 
     if (studentId) {
         const studentIdInput = document.getElementById('studentId');
@@ -403,14 +420,18 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('Showing step1...');
     showStep('step1');
 
+    if (!parentAccessToken) {
+        console.warn('Parent portal opened without secure access token');
+    }
+
     console.log('✅ Parent notification portal loaded successfully');
 });
 
 // Add immediate console log to verify script is loading
 console.log('🔄 Parent portal app.js script loaded');
 
-// Service Worker registration (for production FCM)
-if ('serviceWorker' in navigator) {
+// Service Worker registration is only needed when real web push is configured.
+if (hasConfiguredWebPush() && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('/firebase-messaging-sw.js')
         .then(function (registration) {
             console.log('Service Worker registered:', registration);
@@ -418,6 +439,8 @@ if ('serviceWorker' in navigator) {
         .catch(function (error) {
             console.log('Service Worker registration failed:', error);
         });
+} else {
+    console.log('Web push service worker is disabled for this build');
 }
 
 // Handle browser back button

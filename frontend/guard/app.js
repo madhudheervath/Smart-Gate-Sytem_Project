@@ -1,4 +1,3 @@
-const API_BASE = CONFIG.API_BASE;
 let token = localStorage.getItem('scannerToken');
 let currentUser = null;
 let video = null;
@@ -6,6 +5,11 @@ let canvas = null;
 let canvasContext = null;
 let scanning = false;
 let scanCooldown = false;
+const apiClient = CONFIG.createApiClient();
+
+async function apiFetch(path, options = {}) {
+    return apiClient.fetch(path, options);
+}
 
 // Page navigation
 function showPage(pageId) {
@@ -13,10 +17,20 @@ function showPage(pageId) {
     document.getElementById(pageId).classList.add('active');
 }
 
+function clearGuardSession(showLoginPage = true) {
+    stopCamera();
+    localStorage.removeItem('scannerToken');
+    token = null;
+    currentUser = null;
+    if (showLoginPage) {
+        showPage('loginPage');
+    }
+}
+
 // Login
 document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('email').value;
+    const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
 
@@ -25,7 +39,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
         formData.append('username', email);
         formData.append('password', password);
 
-        const res = await fetch(`${API_BASE}/auth/login`, {
+        const res = await apiFetch('/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
@@ -43,15 +57,20 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
         }
 
         const data = await res.json();
-        token = data.access_token;
-        localStorage.setItem('scannerToken', token);
 
         if (data.role !== 'guard') {
-            errorDiv.textContent = 'This portal is for gate scanners only';
+            clearGuardSession(false);
+            errorDiv.textContent = 'This portal is for security checkpoint personnel only';
             return;
         }
 
-        await loadUserInfo();
+        token = data.access_token;
+        localStorage.setItem('scannerToken', token);
+
+        const loaded = await loadUserInfo();
+        if (!loaded) {
+            throw new Error('Failed to load guard profile');
+        }
         showPage('scannerPage');
         initializeScanner();
         loadStats();
@@ -64,13 +83,22 @@ document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
 // Load user info
 async function loadUserInfo() {
     try {
-        const res = await fetch(`${API_BASE}/auth/me`, {
+        const res = await apiFetch('/auth/me', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (!res.ok) {
+            throw new Error('Failed to authenticate guard session');
+        }
         currentUser = await res.json();
+        if (currentUser.role !== 'guard') {
+            throw new Error('Guard access required');
+        }
         document.getElementById('userName').textContent = currentUser.name;
+        return true;
     } catch (err) {
         console.error('Failed to load user info', err);
+        clearGuardSession();
+        return false;
     }
 }
 
@@ -78,7 +106,7 @@ async function loadUserInfo() {
 async function loadStats() {
     try {
         console.log('Loading stats...');
-        const res = await fetch(`${API_BASE}/scans/stats`, {
+        const res = await apiFetch('/scans/stats', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -104,11 +132,7 @@ async function loadStats() {
 
 // Logout
 function logout() {
-    stopCamera();
-    localStorage.removeItem('scannerToken');
-    token = null;
-    currentUser = null;
-    showPage('loginPage');
+    clearGuardSession();
 }
 
 // Initialize scanner
@@ -201,12 +225,7 @@ function scanFrame() {
 
         if (code && !scanCooldown) {
             scanCooldown = true;
-            // Use face verification if available
-            if (window.faceVerify && window.faceVerify.verifyWithFace) {
-                window.faceVerify.verifyWithFace(code.data);
-            } else {
-                verifyToken(code.data);
-            }
+            verifyToken(code.data);
             setTimeout(() => { scanCooldown = false; }, 3000);
         }
     }
@@ -221,7 +240,7 @@ async function verifyToken(token_str) {
         const formData = new FormData();
         formData.append('token', token_str);
 
-        const res = await fetch(`${API_BASE}/verify`, {
+        const res = await apiFetch('/verify', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -317,7 +336,7 @@ async function loadRecentScans() {
     const container = document.getElementById('recentScans');
 
     try {
-        const res = await fetch(`${API_BASE}/scans?limit=20`, {
+        const res = await apiFetch('/scans?limit=20', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -361,16 +380,11 @@ async function loadRecentScans() {
 
 // Check if already logged in
 if (token) {
-    loadUserInfo().then(() => {
+    loadUserInfo().then((loaded) => {
+        if (!loaded) return;
         showPage('scannerPage');
         initializeScanner();
         loadStats();
         loadRecentScans();
     });
 }
-
-// Initialize recent scans on load (legacy fallback)
-if (document.getElementById('recentScans') && !token) {
-    loadRecentScans();
-}
-

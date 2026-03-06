@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Parent Notifications - Campus GatePass</title>
     <link rel="stylesheet" href="./style.css">
     <style>
@@ -132,13 +135,14 @@
         <div class="header">
             <h1>🏫 Campus GatePass</h1>
             <h2>Parent Notification Setup</h2>
-            <p>Get instant alerts when your child enters or exits the campus</p>
+            <p>Use the secure student link to review campus activity and optionally enable browser alerts on this device</p>
         </div>
 
         <!-- Step 1: Student ID Input -->
         <div id="step1" class="step active">
             <div class="card">
                 <h3>📝 Step 1: Enter Student Information</h3>
+                <p style="margin-top: 0; color: #666;">Open this page from the secure link shared in the student portal. The student details should already be pre-filled.</p>
                 <div class="form-group">
                     <label for="studentId">Student ID (e.g., U22CN362)</label>
                     <input type="text" id="studentId" placeholder="Enter student ID" required>
@@ -170,7 +174,7 @@
                     <!-- Student info will be populated here -->
                 </div>
                 <button class="btn btn-primary" onclick="enableNotifications()">
-                    Enable Push Notifications
+                    Continue Setup
                 </button>
                 <button class="btn btn-secondary" onclick="goBack()">
                     Back
@@ -181,7 +185,7 @@
         <!-- Step 3: Notification Setup -->
         <div id="step3" class="step">
             <div class="card">
-                <h3>🔔 Step 3: Enable Notifications</h3>
+                <h3>🔔 Step 3: Browser Alerts & Parent Access</h3>
                 <div class="notification-status">
                     <div id="notificationProgress">
                         <div class="progress-step">
@@ -191,12 +195,12 @@
                         </div>
                         <div class="progress-step">
                             <span class="step-number">2</span>
-                            <span>Device Registration</span>
+                            <span>Browser Alerts</span>
                             <span id="registrationStatus" class="status">⏳ Waiting...</span>
                         </div>
                         <div class="progress-step">
                             <span class="step-number">3</span>
-                            <span>Link to Student</span>
+                            <span>Parent Contact Link</span>
                             <span id="linkStatus" class="status">⏳ Waiting...</span>
                         </div>
                     </div>
@@ -215,8 +219,8 @@
             <div class="card success-card">
                 <div class="success-icon">🎉</div>
                 <h3>All Set!</h3>
-                <p>You will now receive notifications when <strong id="successStudentName"></strong> enters or exits the
-                    campus.</p>
+                <p>This page is now linked to activity for <strong id="successStudentName"></strong>.</p>
+                <p id="successSetupNote" style="color: #666; margin-top: 10px;"></p>
 
                 <!-- Last Status Display -->
                 <div class="last-status-section" style="margin-top: 20px;">
@@ -250,7 +254,7 @@
                 </div>
 
                 <button class="btn btn-primary" onclick="testNotification()">
-                    Send Test Notification
+                    Send Browser Test Alert
                 </button>
                 <button class="btn btn-secondary" onclick="setupAnother()">
                     Setup Another Child
@@ -282,8 +286,8 @@
         </div>
     </div>
 
-    <script src="../common/config.js"></script>
-    <script src="app.js"></script>
+    <script src="../common/config.js?v=20260306g"></script>
+    <script src="app.js?v=20260306g"></script>
 </body>
 
 </html>

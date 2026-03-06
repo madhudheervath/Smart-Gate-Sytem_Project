@@ -25,9 +25,9 @@ if status['firebase_enabled']:
     print("   - Admins (when new pass request is submitted)")
     
     print("\n💡 Next Steps:")
-    print("   1. Students need to register FCM tokens in frontend")
-    print("   2. Use POST /api/register_fcm_token to save tokens")
-    print("   3. Notifications will be sent automatically!")
+    print("   1. Backend push delivery is ready")
+    print("   2. Real browser/web push still needs explicit frontend Firebase configuration")
+    print("   3. Without that setup, the portals only support browser-local alerts and signed parent links")
 else:
     print("\n⚠️  Firebase not enabled")
     print("   Check: /home/madhu/smart Gate/backend/firebase-credentials.json")
@@ -72,5 +72,5 @@ print("                                   ['parent_fcm_token'], ['+919876543210'
 print("\n3. Test Admin Alert:")
 print("   notifications.notify_admin_new_request(['admin_fcm_token'], 'John Doe', 124)")
 
-print("\n✅ All notification functions are loaded and ready!")
+print("\n✅ Backend notification functions are loaded and ready!")
 print("="*60 + "\n")

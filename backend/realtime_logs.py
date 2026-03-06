@@ -50,17 +50,19 @@ class ConnectionManager:
 # Global connection manager
 manager = ConnectionManager()
 
+
+def _start_of_day(value: datetime) -> datetime:
+    return value.replace(hour=0, minute=0, second=0, microsecond=0)
+
 def get_recent_logs(db: Session, limit: int = 100, offset: int = 0) -> List[Dict]:
     """Get recent scan logs with student information"""
-    
-    logs = db.query(ScanLog).join(
+
+    logs = db.query(ScanLog, User).join(
         User, ScanLog.student_id == User.id
     ).order_by(ScanLog.scan_time.desc()).limit(limit).offset(offset).all()
-    
+
     result = []
-    for log in logs:
-        student = db.query(User).filter(User.id == log.student_id).first()
-        
+    for log, student in logs:
         # Check if emergency flag exists (column might not exist in older databases)
         is_emergency = False
         try:
@@ -86,40 +88,43 @@ def get_recent_logs(db: Session, limit: int = 100, offset: int = 0) -> List[Dict
 
 def get_log_statistics(db: Session, days: int = 7) -> Dict:
     """Get statistics for the last N days"""
-    
-    start_date = datetime.now() - timedelta(days=days)
-    
+
+    now = datetime.now()
+    period_start = _start_of_day(now - timedelta(days=max(days - 1, 0)))
+
     # Total scans
     total_scans = db.query(ScanLog).filter(
-        ScanLog.scan_time >= start_date
+        ScanLog.scan_time >= period_start
     ).count()
-    
+
     # Successful scans
     successful_scans = db.query(ScanLog).filter(
         and_(
-            ScanLog.scan_time >= start_date,
+            ScanLog.scan_time >= period_start,
             ScanLog.result == "success"
         )
     ).count()
-    
-    # Entry vs Exit
-    entries = db.query(ScanLog).filter(
+
+    # Successful entry vs exit counts for the full period
+    entries_period = db.query(ScanLog).filter(
         and_(
-            ScanLog.scan_time >= start_date,
-            ScanLog.pass_type == "entry"
+            ScanLog.scan_time >= period_start,
+            ScanLog.pass_type == "entry",
+            ScanLog.result == "success",
         )
     ).count()
-    
-    exits = db.query(ScanLog).filter(
+
+    exits_period = db.query(ScanLog).filter(
         and_(
-            ScanLog.scan_time >= start_date,
-            ScanLog.pass_type == "exit"
+            ScanLog.scan_time >= period_start,
+            ScanLog.pass_type == "exit",
+            ScanLog.result == "success",
         )
     ).count()
-    
+
     # Current students in campus (entries - exits today)
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    
+    today_start = _start_of_day(now)
+
     today_entries = db.query(ScanLog).filter(
         and_(
             ScanLog.scan_time >= today_start,
@@ -142,11 +147,15 @@ def get_log_statistics(db: Session, days: int = 7) -> Dict:
         "total_scans": total_scans,
         "successful_scans": successful_scans,
         "failed_scans": total_scans - successful_scans,
-        "entries": entries,
-        "exits": exits,
+        "entries": entries_period,
+        "exits": exits_period,
+        "entries_today": today_entries,
+        "exits_today": today_exits,
         "students_in_campus": students_in_campus,
         "success_rate": round((successful_scans / total_scans * 100) if total_scans > 0 else 0, 1),
-        "period_days": days
+        "period_days": days,
+        "period_start": period_start.strftime("%Y-%m-%d"),
+        "period_end": today_start.strftime("%Y-%m-%d"),
     }
 
 def get_hourly_stats(db: Session, date: Optional[datetime] = None) -> Dict:
@@ -191,26 +200,28 @@ def get_hourly_stats(db: Session, date: Optional[datetime] = None) -> Dict:
 
 def get_daily_stats(db: Session, days: int = 7) -> Dict:
     """Get daily statistics for the last N days"""
-    
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
-    
+
+    today_start = _start_of_day(datetime.now())
+    start_date = today_start - timedelta(days=max(days - 1, 0))
+    end_date = today_start + timedelta(days=1)
+
     daily_data = {}
-    
+
     # Initialize all days
     for i in range(days):
         date = start_date + timedelta(days=i)
         date_str = date.strftime("%Y-%m-%d")
         daily_data[date_str] = {"entries": 0, "exits": 0}
-    
+
     # Get scans
     scans = db.query(ScanLog).filter(
         and_(
             ScanLog.scan_time >= start_date,
+            ScanLog.scan_time < end_date,
             ScanLog.result == "success"
         )
     ).all()
-    
+
     for scan in scans:
         date_str = scan.scan_time.strftime("%Y-%m-%d")
         if date_str in daily_data:
@@ -228,7 +239,11 @@ def get_daily_stats(db: Session, days: int = 7) -> Dict:
     return {
         "labels": labels,
         "entries": entry_data,
-        "exits": exit_data
+        "exits": exit_data,
+        "date_range": {
+            "start": start_date.strftime("%Y-%m-%d"),
+            "end": today_start.strftime("%Y-%m-%d"),
+        }
     }
 
 def get_top_active_students(db: Session, days: int = 7, limit: int = 10) -> List[Dict]:
@@ -277,28 +292,39 @@ def search_logs(db: Session,
     """Search logs with filters"""
     
     query = db.query(ScanLog).join(User, ScanLog.student_id == User.id)
-    
+
     if student_id:
-        query = query.filter(User.student_id.like(f"%{student_id}%"))
-    
+        search_term = f"%{student_id}%"
+        query = query.filter(
+            or_(
+                User.student_id.ilike(search_term),
+                User.name.ilike(search_term),
+            )
+        )
+
     if date_from:
         query = query.filter(ScanLog.scan_time >= date_from)
-    
+
     if date_to:
         query = query.filter(ScanLog.scan_time <= date_to)
-    
+
     if scan_type:
         query = query.filter(ScanLog.pass_type == scan_type)
-    
+
     if result:
         query = query.filter(ScanLog.result == result)
-    
+
     logs = query.order_by(ScanLog.scan_time.desc()).limit(limit).all()
-    
+
     result = []
     for log in logs:
         student = db.query(User).filter(User.id == log.student_id).first()
-        
+        is_emergency = False
+        try:
+            is_emergency = getattr(log, 'emergency', False) or False
+        except:
+            is_emergency = False
+
         result.append({
             "id": log.id,
             "student_id": student.student_id if student else "Unknown",
@@ -308,8 +334,9 @@ def search_logs(db: Session,
             "date": log.scan_time.strftime("%B %d, %Y"),
             "scan_type": log.pass_type,
             "result": log.result,
-            "gate": "Main Gate",
-            "details": log.details
+            "gate": "Emergency Exit" if is_emergency else "Main Gate",
+            "details": log.details,
+            "emergency": is_emergency,
         })
-    
+
     return result

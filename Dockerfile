@@ -45,4 +45,4 @@ USER appuser
 EXPOSE 8080
 
 # Command to run the application
-CMD ["sh", "-c", "python seed.py && uvicorn app:app --host 0.0.0.0 --port 8080"]
+CMD ["sh", "-c", "python bootstrap.py && uvicorn app:app --host 0.0.0.0 --port 8080"]
