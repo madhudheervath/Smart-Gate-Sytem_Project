@@ -2,7 +2,6 @@ function isLocalhostHost(hostname) {
     return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
-const REMOTE_API_BASE = 'https://smart-gate-sytem-project.onrender.com';
 const RETRYABLE_STATUS_CODES = new Set([404, 405, 501, 502, 503, 504]);
 const DEFAULT_API_TIMEOUT_MS = 15000;
 
@@ -10,8 +9,7 @@ function getApiCandidates() {
     const host = window.location.hostname;
     if (!isLocalhostHost(host)) {
         return [
-            window.location.origin,
-            REMOTE_API_BASE
+            window.location.origin
         ].filter(Boolean).filter((value, index, array) => array.indexOf(value) === index);
     }
 

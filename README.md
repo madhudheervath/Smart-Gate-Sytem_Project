@@ -205,17 +205,26 @@ JWT_SECRET=your-jwt-secret
 
 # Database
 DB_URL=sqlite:///./gatepass.db
-# Production: postgresql://user:pass@localhost/gatepass
+# Production: DATABASE_URL=postgresql://user:pass@host:5432/gatepass
 
 # Token Expiry
 ACCESS_TOKEN_EXPIRE_MINUTES=720
 QR_TTL_MINUTES=15
 SMARTGATE_SEED_MODE=if_empty
+SELF_REGISTRATION_ENABLED=false
+ACCOUNT_REQUESTS_ENABLED=true
 
 # Firebase (optional)
-FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
+FIREBASE_CREDENTIALS_JSON={"type":"service_account",...}
 
-# Geofencing
+# Twilio SMS (optional)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
+# Feature toggles
+FACE_AUTH_ENABLED=true
+NOTIFICATIONS_ENABLED=false
 GEOFENCE_ENABLED=true
 ```
 
@@ -227,6 +236,16 @@ GEOFENCE_ENABLED=true
 3. Set radius and save
 
 **Via JSON File:** `backend/location_settings.json`
+
+### Production Deployment
+
+Render is the recommended production target for this project because the backend depends on heavy native Python packages for face recognition and computer vision.
+
+- Render deployment guide: [RENDER_DEPLOYMENT.md](/home/madhu/smart%20Gate/RENDER_DEPLOYMENT.md)
+- Render blueprint: [render.yaml](/home/madhu/smart%20Gate/render.yaml)
+
+If you already have a stable Render PostgreSQL database, keep it and point `DATABASE_URL` at it. Use Supabase only if you need a new managed Postgres instance.
+For an exact step-by-step setup, including Supabase fallback and what to expect on Render free vs paid, use [RENDER_DEPLOYMENT.md](/home/madhu/smart%20Gate/RENDER_DEPLOYMENT.md).
 
 ---
 

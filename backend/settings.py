@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     QR_TTL_MINUTES: int = 15
     SELF_REGISTRATION_ENABLED: bool = False
     ACCOUNT_REQUESTS_ENABLED: bool = True
+    FACE_AUTH_ENABLED: bool = True
+    NOTIFICATIONS_ENABLED: bool = True
+    GEOFENCE_ENABLED: bool = True
 
     @field_validator("DB_URL")
     @classmethod

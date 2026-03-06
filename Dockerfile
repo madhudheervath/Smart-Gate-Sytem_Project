@@ -41,8 +41,8 @@ RUN adduser --disabled-password --gecos '' appuser
 RUN chown -R appuser:appuser /app
 USER appuser
 
-# Expose the port
-EXPOSE 8080
+# Expose the Render default web port
+EXPOSE 10000
 
 # Command to run the application
-CMD ["sh", "-c", "python bootstrap.py && uvicorn app:app --host 0.0.0.0 --port 8080"]
+CMD ["sh", "-c", "python bootstrap.py && uvicorn app:app --host 0.0.0.0 --port ${PORT:-10000}"]

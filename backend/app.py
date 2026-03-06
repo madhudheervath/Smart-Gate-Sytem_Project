@@ -1,8 +1,8 @@
 
-
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -28,22 +28,30 @@ import hmac
 import hashlib
 import os
 
-# Optional imports - disable if not installed
-try:
-    import face_auth
-    FACE_AUTH_ENABLED = True
-except ImportError:
+# Optional imports - disable if not installed or explicitly turned off via env
+if settings.FACE_AUTH_ENABLED:
+    try:
+        import face_auth
+        FACE_AUTH_ENABLED = True
+    except ImportError:
+        FACE_AUTH_ENABLED = False
+        print("⚠️  Face authentication disabled - install face-recognition to enable")
+        print("    Run: pip install face-recognition")
+else:
     FACE_AUTH_ENABLED = False
-    print("⚠️  Face authentication disabled - install face-recognition to enable")
-    print("    Run: pip install face-recognition")
+    print("⚠️  Face authentication disabled by configuration")
 
-try:
-    import notifications_v2 as notifications
-    NOTIFICATIONS_ENABLED = True
-    print("✅ Notifications module loaded successfully")
-except Exception as e:
+if settings.NOTIFICATIONS_ENABLED:
+    try:
+        import notifications_v2 as notifications
+        NOTIFICATIONS_ENABLED = True
+        print("✅ Notifications module loaded successfully")
+    except Exception as e:
+        NOTIFICATIONS_ENABLED = False
+        print(f"⚠️  Notifications disabled: {e}")
+else:
     NOTIFICATIONS_ENABLED = False
-    print(f"⚠️  Notifications disabled: {e}")
+    print("⚠️  Notifications disabled by configuration")
 
 try:
     import realtime_logs
@@ -53,14 +61,18 @@ except Exception as e:
     REALTIME_LOGS_ENABLED = False
     print(f"⚠️  Real-time logs disabled: {e}")
 
-try:
-    import geofence
-    import location_settings
-    GEOFENCE_ENABLED = True
-except ImportError:
+if settings.GEOFENCE_ENABLED:
+    try:
+        import geofence
+        import location_settings
+        GEOFENCE_ENABLED = True
+    except ImportError:
+        GEOFENCE_ENABLED = False
+        print("⚠️  GPS geofencing disabled - install shapely and geopy to enable")
+        print("    Run: pip install shapely geopy")
+else:
     GEOFENCE_ENABLED = False
-    print("⚠️  GPS geofencing disabled - install shapely and geopy to enable")
-    print("    Run: pip install shapely geopy")
+    print("⚠️  GPS geofencing disabled by configuration")
 
 # IST timezone (UTC+5:30)
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -1476,6 +1488,12 @@ def request_emergency_exit(
 @app.get("/")
 def root():
     return {"message": "GatePass QR System API", "version": "1.0"}
+
+
+@app.get("/healthz")
+def healthz(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+    return {"status": "ok"}
 
 # Serve Firebase service worker
 @app.get("/firebase-messaging-sw.js")
