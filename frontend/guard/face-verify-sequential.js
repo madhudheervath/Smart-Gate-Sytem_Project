@@ -18,6 +18,45 @@
     let currentMode = 'qr'; // 'qr' or 'face'
     let scannedToken = null;
 
+function getGuardApiClient() {
+    if (window.__guardFaceApiClient) {
+        return window.__guardFaceApiClient;
+    }
+
+    if (window.CONFIG && typeof window.CONFIG.createApiClient === 'function') {
+        window.__guardFaceApiClient = window.CONFIG.createApiClient();
+        return window.__guardFaceApiClient;
+    }
+
+    return null;
+}
+
+async function guardApiFetch(path, options = {}) {
+    if (typeof apiFetch === 'function') {
+        return apiFetch(path, options);
+    }
+
+    const apiClient = getGuardApiClient();
+    if (apiClient) {
+        return apiClient.fetch(path, options);
+    }
+
+    return fetch(`${window.location.origin}${path}`, options);
+}
+
+async function parseApiResponse(response) {
+    const rawText = await response.text();
+    if (!rawText) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(rawText);
+    } catch {
+        return { detail: rawText };
+    }
+}
+
 // Update status display
 function updateStatus(message, className = '') {
     const statusDiv = document.getElementById('scanStatus');
@@ -199,15 +238,16 @@ async function verifyQRAndFace(qrToken, faceBlob) {
         
         console.log('Sending verification: QR + Face');
         
-        const res = await fetch(`${API_BASE}/verify`, {
+        const res = await guardApiFetch('/verify', {
             method: 'POST',
+            timeoutMs: 120000,
             headers: {
                 'Authorization': `Bearer ${token}`
             },
             body: formData
         });
 
-        const data = await res.json();
+        const data = await parseApiResponse(res);
         console.log('Verification response:', data);
         
         if (res.ok) {
@@ -274,15 +314,16 @@ async function verifyQROnly(qrToken) {
         const formData = new FormData();
         formData.append('token', qrToken);
         
-        const res = await fetch(`${API_BASE}/verify`, {
+        const res = await guardApiFetch('/verify', {
             method: 'POST',
+            timeoutMs: 120000,
             headers: {
                 'Authorization': `Bearer ${token}`
             },
             body: formData
         });
 
-        const data = await res.json();
+        const data = await parseApiResponse(res);
         
         if (res.ok) {
             const studentInfo = data.student_name ? 

@@ -2,6 +2,7 @@ import os
 
 from database import Base, SessionLocal, engine
 from models import User
+from runtime_schema import ensure_runtime_schema
 from seed import seed_demo_users
 
 
@@ -21,6 +22,7 @@ def bootstrap():
     mode = _normalize_seed_mode(os.getenv("SMARTGATE_SEED_MODE", "if_empty"))
 
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema(engine)
     db = SessionLocal()
     try:
         user_count = db.query(User).count()

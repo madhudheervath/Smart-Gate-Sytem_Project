@@ -11,6 +11,7 @@ from database import Base, engine, get_db, SessionLocal
 from models import User, RegistrationRequest, PassRequest, ScanLog
 from schemas import *
 from schemas import UserRegister
+from runtime_schema import ensure_runtime_schema
 from auth import (
     hash_pwd,
     verify_pwd,
@@ -153,6 +154,7 @@ app.add_middleware(
 
 # create tables
 Base.metadata.create_all(bind=engine)
+ensure_runtime_schema(engine)
 
 ALLOWED_ACCOUNT_REQUEST_ROLES = {"personnel", "student", "guard"}
 
