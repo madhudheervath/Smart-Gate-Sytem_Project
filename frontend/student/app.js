@@ -294,13 +294,24 @@ async function loadFaceStatus() {
             return;
         }
 
-        if (status.face_registered) {
+        if (status.requires_refresh) {
+            faceStatusDiv.innerHTML = `
+                <div style="background:rgba(255,193,7,0.18); padding:15px; border-radius:12px;">
+                    <p style="font-size:18px; font-weight:700; margin-bottom:8px;">⚠️ Face Re-Registration Required</p>
+                    <p style="opacity:0.95;">Your earlier face registration used an older verification model.</p>
+                    <p style="opacity:0.9; font-size:14px; margin-top:5px;">Current backend: ${status.backend || 'default'}</p>
+                    <p style="opacity:0.9; font-size:14px; margin-top:5px;">Previous registration: ${status.registration_backend || 'legacy'}</p>
+                    <p style="opacity:0.9; font-size:13px; margin-top:8px;">Please upload a fresh face photo so gate verification uses the stricter model.</p>
+                </div>
+            `;
+            faceRegForm.style.display = 'block';
+        } else if (status.face_registered) {
             const regDate = new Date(status.face_registered_at).toLocaleDateString();
             faceStatusDiv.innerHTML = `
                 <div style="background:rgba(255,255,255,0.2); padding:15px; border-radius:12px;">
                     <p style="font-size:18px; font-weight:700; margin-bottom:8px;">✅ Face Registered</p>
                     <p style="opacity:0.9;">Registered on: ${regDate}</p>
-                    <p style="opacity:0.9;">Backend: ${status.backend || 'default'}</p>
+                    <p style="opacity:0.9;">Backend: ${status.registration_backend || status.backend || 'default'}</p>
                     <p style="opacity:0.9; font-size:13px; margin-top:8px;">Your face is verified at gate entry for enhanced security.</p>
                 </div>
             `;

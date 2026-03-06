@@ -103,6 +103,48 @@ def get_face_auth_module():
         print(f"⚠️  Face authentication unavailable: {e}")
         return None
 
+
+def _decode_face_encoding(face_auth_module, encoding_json: Optional[str]):
+    if not encoding_json:
+        return None
+
+    try:
+        return face_auth_module.json_to_encoding(encoding_json)
+    except Exception as e:
+        print(f"⚠️  Failed to decode stored face encoding: {e}")
+        return None
+
+
+def _find_duplicate_face_registration(db: Session, user: User, encoding: object, face_auth_module):
+    duplicate_tolerance = getattr(face_auth_module, "get_duplicate_tolerance", lambda _=None: 0.18)(encoding)
+    candidates = db.query(User).filter(
+        User.id != user.id,
+        User.face_registered == True,
+        User.face_encoding.isnot(None),
+    ).all()
+
+    for candidate in candidates:
+        candidate_encoding = _decode_face_encoding(face_auth_module, candidate.face_encoding)
+        if candidate_encoding is None:
+            continue
+
+        if getattr(face_auth_module, "requires_reenrollment", lambda _: False)(candidate_encoding):
+            continue
+
+        is_match, distance = face_auth_module.compare_faces(
+            candidate_encoding,
+            encoding,
+            tolerance=duplicate_tolerance,
+        )
+        if is_match:
+            print(
+                f"⚠️  Duplicate face registration blocked for {user.email}; "
+                f"matched existing user #{candidate.id} at distance {distance:.3f}"
+            )
+            return candidate, distance
+
+    return None, None
+
 # IST timezone (UTC+5:30)
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -831,19 +873,23 @@ async def verify(
                     
                     if check_encoding is not None:
                         # Get stored encoding for THIS specific student
-                        stored_encoding = face_auth_module.json_to_encoding(student.face_encoding)
+                        stored_encoding = _decode_face_encoding(face_auth_module, student.face_encoding)
+                        if stored_encoding is None:
+                            return _fail(db, pid, uid, guard.id, "invalid", "face-registration-outdated")
+                        if getattr(face_auth_module, "requires_reenrollment", lambda _: False)(stored_encoding):
+                            return _fail(db, pid, uid, guard.id, "invalid", "face-registration-outdated")
                         print(f"DEBUG: Comparing captured face with {student.name}'s registered face")
                         
-                        # Compare faces with stricter tolerance (0.5 instead of 0.6)
-                        is_match, distance = face_auth_module.compare_faces(stored_encoding, check_encoding, tolerance=0.5)
+                        tolerance = getattr(face_auth_module, "get_match_tolerance", lambda _=None: 0.5)(stored_encoding)
+                        is_match, distance = face_auth_module.compare_faces(stored_encoding, check_encoding, tolerance=tolerance)
                         print(f"DEBUG: Face comparison result:")
                         print(f"       - Student: {student.name} ({student.student_id})")
                         print(f"       - Match: {is_match}")
                         print(f"       - Distance: {distance:.4f}")
-                        print(f"       - Tolerance: 0.5")
+                        print(f"       - Tolerance: {tolerance}")
                         
                         # Get confidence
-                        confidence_info = face_auth_module.get_confidence_level(distance)
+                        confidence_info = face_auth_module.get_confidence_level(distance, stored_encoding)
                         
                         # Convert numpy types to Python native types for JSON serialization
                         face_verified = bool(is_match)
@@ -1161,6 +1207,16 @@ if FACE_AUTH_ENABLED:
                 status_code=400,
                 detail="No clear face detected. Use a bright, upright photo with only one face visible and try again."
             )
+
+        duplicate_user, duplicate_distance = _find_duplicate_face_registration(db, user, encoding, face_auth_module)
+        if duplicate_user is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This face is too similar to another registered account. "
+                    "Use your own face image or contact an administrator."
+                ),
+            )
         
         # Store encoding
         user.face_encoding = face_auth_module.encoding_to_json(encoding)
@@ -1226,13 +1282,19 @@ if FACE_AUTH_ENABLED:
             )
         
         # Get stored encoding
-        stored_encoding = face_auth_module.json_to_encoding(student.face_encoding)
+        stored_encoding = _decode_face_encoding(face_auth_module, student.face_encoding)
+        if stored_encoding is None or getattr(face_auth_module, "requires_reenrollment", lambda _: False)(stored_encoding):
+            raise HTTPException(
+                status_code=409,
+                detail="Student must re-register face with the updated verification model"
+            )
         
         # Compare faces
-        is_match, distance = face_auth_module.compare_faces(stored_encoding, check_encoding, tolerance=0.6)
+        tolerance = getattr(face_auth_module, "get_match_tolerance", lambda _=None: 0.6)(stored_encoding)
+        is_match, distance = face_auth_module.compare_faces(stored_encoding, check_encoding, tolerance=tolerance)
         
         # Get confidence level
-        confidence_info = face_auth_module.get_confidence_level(distance)
+        confidence_info = face_auth_module.get_confidence_level(distance, stored_encoding)
         
         return FaceVerificationResponse(
             verified=is_match,
@@ -1255,6 +1317,17 @@ if FACE_AUTH_ENABLED:
             backend_error = getattr(face_auth_module, "get_backend_error", lambda: backend_error)()
             service_available = backend_error is None
 
+        stored_encoding = None
+        registration_backend = None
+        requires_refresh = False
+        if face_auth_module is not None and user.face_encoding:
+            stored_encoding = _decode_face_encoding(face_auth_module, user.face_encoding)
+            if stored_encoding is None:
+                requires_refresh = True
+            else:
+                registration_backend = getattr(face_auth_module, "get_encoding_backend", lambda _: None)(stored_encoding)
+                requires_refresh = getattr(face_auth_module, "requires_reenrollment", lambda _: False)(stored_encoding)
+
         return {
             "face_registered": user.face_registered,
             "face_registered_at": user.face_registered_at,
@@ -1262,6 +1335,8 @@ if FACE_AUTH_ENABLED:
             "service_available": service_available,
             "backend": backend,
             "backend_error": backend_error,
+            "registration_backend": registration_backend,
+            "requires_refresh": requires_refresh,
         }
 else:
     # Provide stub endpoints when face auth is disabled

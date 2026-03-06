@@ -24,12 +24,17 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 MAX_FACE_IMAGE_DIMENSION = 960
 DEFAULT_FACE_BACKEND = (os.getenv("FACE_AUTH_BACKEND", "opencv") or "opencv").strip().lower()
+CURRENT_OPENCV_ENCODING_BACKEND = "opencv_strict_v2"
+LEGACY_OPENCV_BACKENDS = {"opencv_lbp_v1"}
+OPENCV_MATCH_TOLERANCE = 0.22
+OPENCV_DUPLICATE_TOLERANCE = 0.18
 
 _cv2_module = None
 _face_recognition_module = None
 _backend_name = None
 _backend_error = None
 _haar_classifier = None
+_hog_descriptor_instance = None
 
 
 def now_ist():
@@ -130,6 +135,23 @@ def _get_haar_classifier():
     return _haar_classifier
 
 
+def _get_hog_descriptor():
+    global _hog_descriptor_instance
+
+    if _hog_descriptor_instance is not None:
+        return _hog_descriptor_instance
+
+    cv2 = _import_cv2()
+    _hog_descriptor_instance = cv2.HOGDescriptor(
+        _winSize=(64, 64),
+        _blockSize=(16, 16),
+        _blockStride=(8, 8),
+        _cellSize=(8, 8),
+        _nbins=9,
+    )
+    return _hog_descriptor_instance
+
+
 def _detect_largest_face(gray_image: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
     cv2 = _import_cv2()
     classifier = _get_haar_classifier()
@@ -169,7 +191,7 @@ def _detect_largest_face(gray_image: np.ndarray) -> Optional[Tuple[int, int, int
 def _crop_face(gray_image: np.ndarray, face_box: Tuple[int, int, int, int]) -> np.ndarray:
     cv2 = _import_cv2()
     x, y, w, h = face_box
-    pad = int(max(w, h) * 0.18)
+    pad = int(max(w, h) * 0.12)
     x1 = max(0, x - pad)
     y1 = max(0, y - pad)
     x2 = min(gray_image.shape[1], x + w + pad)
@@ -203,7 +225,7 @@ def _rotated_gray_candidates(gray_image: np.ndarray) -> list[np.ndarray]:
     return candidates
 
 
-def _lbp_histogram(face_region: np.ndarray) -> np.ndarray:
+def _compute_lbp_codes(face_region: np.ndarray) -> np.ndarray:
     center = face_region[1:-1, 1:-1]
     lbp = np.zeros(center.shape, dtype=np.uint8)
 
@@ -221,10 +243,43 @@ def _lbp_histogram(face_region: np.ndarray) -> np.ndarray:
     for index, neighbor in enumerate(neighbors):
         lbp |= ((neighbor >= center).astype(np.uint8) << index)
 
+    return lbp
+
+
+def _lbp_histogram(face_region: np.ndarray) -> np.ndarray:
+    lbp = _compute_lbp_codes(face_region)
     hist, _ = np.histogram(lbp.ravel(), bins=256, range=(0, 256))
     hist = hist.astype(np.float32)
     hist /= hist.sum() + 1e-7
     return hist
+
+
+def _grid_lbp_descriptor(face_region: np.ndarray, grid: Tuple[int, int] = (4, 4), bins: int = 32) -> np.ndarray:
+    height, width = face_region.shape[:2]
+    rows, cols = grid
+    histograms = []
+
+    for row in range(rows):
+        for col in range(cols):
+            y1 = (row * height) // rows
+            y2 = ((row + 1) * height) // rows
+            x1 = (col * width) // cols
+            x2 = ((col + 1) * width) // cols
+            cell = face_region[y1:y2, x1:x2]
+            if cell.shape[0] < 3 or cell.shape[1] < 3:
+                histograms.append(np.zeros(bins, dtype=np.float32))
+                continue
+
+            lbp = _compute_lbp_codes(cell)
+            lbp = (lbp.astype(np.int32) * bins) // 256
+            hist, _ = np.histogram(lbp.ravel(), bins=bins, range=(0, bins))
+            hist = hist.astype(np.float32)
+            hist /= hist.sum() + 1e-7
+            histograms.append(hist)
+
+    vector = np.concatenate(histograms).astype(np.float32)
+    vector /= np.linalg.norm(vector) + 1e-7
+    return vector
 
 
 def _intensity_histogram(face_region: np.ndarray) -> np.ndarray:
@@ -236,9 +291,22 @@ def _intensity_histogram(face_region: np.ndarray) -> np.ndarray:
 
 def _template_vector(face_region: np.ndarray) -> np.ndarray:
     cv2 = _import_cv2()
-    template = cv2.resize(face_region, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32)
+    inset = max(8, face_region.shape[0] // 10)
+    focused = face_region[inset:-inset, inset:-inset]
+    if focused.size == 0:
+        focused = face_region
+    template = cv2.resize(focused, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32)
     template /= 255.0
     return template.flatten()
+
+
+def _hog_descriptor(face_region: np.ndarray) -> np.ndarray:
+    cv2 = _import_cv2()
+    descriptor = _get_hog_descriptor()
+    resized = cv2.resize(face_region, (64, 64), interpolation=cv2.INTER_AREA)
+    hog = descriptor.compute(resized).flatten().astype(np.float32)
+    hog /= np.linalg.norm(hog) + 1e-7
+    return hog
 
 
 def _extract_opencv_encoding(image_bytes: bytes) -> Optional[dict]:
@@ -255,9 +323,9 @@ def _extract_opencv_encoding(image_bytes: bytes) -> Optional[dict]:
 
             face_region = _crop_face(candidate, face_box)
             return {
-                "backend": "opencv_lbp_v1",
-                "lbp_hist": _lbp_histogram(face_region).tolist(),
-                "intensity_hist": _intensity_histogram(face_region).tolist(),
+                "backend": CURRENT_OPENCV_ENCODING_BACKEND,
+                "grid_lbp": _grid_lbp_descriptor(face_region).tolist(),
+                "hog": _hog_descriptor(face_region).tolist(),
                 "template": _template_vector(face_region).tolist(),
             }
 
@@ -322,28 +390,37 @@ def extract_face_encoding(image_bytes: bytes) -> Optional[object]:
     return _extract_opencv_encoding(image_bytes)
 
 
-def _compare_opencv_encodings(known_encoding: dict, check_encoding: dict, tolerance: float) -> Tuple[bool, float]:
-    cv2 = _import_cv2()
+def _cosine_distance(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
+    denominator = float(np.linalg.norm(vec_a) * np.linalg.norm(vec_b)) + 1e-7
+    similarity = float(np.dot(vec_a, vec_b) / denominator)
+    similarity = max(-1.0, min(1.0, similarity))
+    return (1.0 - similarity) / 2.0
 
-    known_lbp = np.array(known_encoding["lbp_hist"], dtype=np.float32)
-    check_lbp = np.array(check_encoding["lbp_hist"], dtype=np.float32)
-    lbp_distance = float(cv2.compareHist(known_lbp, check_lbp, cv2.HISTCMP_BHATTACHARYYA))
 
-    known_intensity = np.array(known_encoding["intensity_hist"], dtype=np.float32)
-    check_intensity = np.array(check_encoding["intensity_hist"], dtype=np.float32)
-    intensity_distance = float(
-        cv2.compareHist(known_intensity, check_intensity, cv2.HISTCMP_BHATTACHARYYA)
-    )
+def _compare_opencv_strict_encodings(known_encoding: dict, check_encoding: dict, tolerance: float) -> Tuple[bool, float]:
+    known_lbp = np.array(known_encoding["grid_lbp"], dtype=np.float32)
+    check_lbp = np.array(check_encoding["grid_lbp"], dtype=np.float32)
+    lbp_distance = _cosine_distance(known_lbp, check_lbp)
+
+    known_hog = np.array(known_encoding["hog"], dtype=np.float32)
+    check_hog = np.array(check_encoding["hog"], dtype=np.float32)
+    hog_distance = _cosine_distance(known_hog, check_hog)
 
     known_template = np.array(known_encoding["template"], dtype=np.float32)
     check_template = np.array(check_encoding["template"], dtype=np.float32)
     template_distance = float(np.mean(np.abs(known_template - check_template)))
 
     distance = min(
-        max(0.55 * lbp_distance + 0.15 * intensity_distance + 0.30 * template_distance, 0.0),
+        max(0.45 * lbp_distance + 0.40 * hog_distance + 0.15 * template_distance, 0.0),
         1.0,
     )
-    is_match = distance <= tolerance
+    effective_tolerance = min(tolerance, OPENCV_MATCH_TOLERANCE)
+    is_match = (
+        distance <= effective_tolerance
+        and lbp_distance <= 0.24
+        and hog_distance <= 0.18
+        and template_distance <= 0.20
+    )
     return is_match, distance
 
 
@@ -368,8 +445,13 @@ def compare_faces(known_encoding: object, check_encoding: object, tolerance: flo
     """
     try:
         if isinstance(known_encoding, dict) and isinstance(check_encoding, dict):
-            if known_encoding.get("backend") == "opencv_lbp_v1" and check_encoding.get("backend") == "opencv_lbp_v1":
-                return _compare_opencv_encodings(known_encoding, check_encoding, tolerance)
+            known_backend = known_encoding.get("backend")
+            check_backend = check_encoding.get("backend")
+            if known_backend == CURRENT_OPENCV_ENCODING_BACKEND and check_backend == CURRENT_OPENCV_ENCODING_BACKEND:
+                return _compare_opencv_strict_encodings(known_encoding, check_encoding, tolerance)
+
+            if known_backend in LEGACY_OPENCV_BACKENDS or check_backend in LEGACY_OPENCV_BACKENDS:
+                return False, 1.0
 
         if isinstance(known_encoding, list) and isinstance(check_encoding, list):
             return _compare_face_recognition_encodings(known_encoding, check_encoding, tolerance)
@@ -388,6 +470,39 @@ def encoding_to_json(encoding: object) -> str:
 def json_to_encoding(json_str: str) -> object:
     """Convert JSON string back to a face encoding structure."""
     return json.loads(json_str)
+
+
+def get_encoding_backend(encoding: object) -> Optional[str]:
+    if isinstance(encoding, dict):
+        return encoding.get("backend")
+    if isinstance(encoding, list):
+        return "face_recognition"
+    return None
+
+
+def requires_reenrollment(encoding: object) -> bool:
+    backend = get_encoding_backend(encoding)
+    if backend in LEGACY_OPENCV_BACKENDS:
+        return True
+    return backend is None
+
+
+def get_match_tolerance(encoding: Optional[object] = None) -> float:
+    backend = get_encoding_backend(encoding)
+    if backend == CURRENT_OPENCV_ENCODING_BACKEND:
+        return OPENCV_MATCH_TOLERANCE
+    if backend == "face_recognition":
+        return 0.5
+    return OPENCV_MATCH_TOLERANCE
+
+
+def get_duplicate_tolerance(encoding: Optional[object] = None) -> float:
+    backend = get_encoding_backend(encoding)
+    if backend == CURRENT_OPENCV_ENCODING_BACKEND:
+        return OPENCV_DUPLICATE_TOLERANCE
+    if backend == "face_recognition":
+        return 0.42
+    return OPENCV_DUPLICATE_TOLERANCE
 
 
 def validate_image(image_bytes: bytes, max_size_mb: int = 5) -> Tuple[bool, Optional[str]]:
@@ -417,17 +532,43 @@ def validate_image(image_bytes: bytes, max_size_mb: int = 5) -> Tuple[bool, Opti
 
 
 # Face matching confidence levels
-CONFIDENCE_LEVELS = {
-    "high": (0.0, 0.35, "High confidence match"),
-    "medium": (0.35, 0.5, "Medium confidence match"),
-    "low": (0.5, 0.65, "Low confidence match"),
-    "no_match": (0.65, 1.01, "No match"),
-}
-
-
-def get_confidence_level(distance: float) -> dict:
+def get_confidence_level(distance: float, encoding: Optional[object] = None) -> dict:
     """Get confidence level description for a face distance."""
-    for level, (min_d, max_d, desc) in CONFIDENCE_LEVELS.items():
+    backend = get_encoding_backend(encoding)
+
+    if backend == CURRENT_OPENCV_ENCODING_BACKEND:
+        if distance <= 0.10:
+            level = "high"
+            description = "High confidence match"
+        elif distance <= 0.16:
+            level = "medium"
+            description = "Medium confidence match"
+        elif distance <= OPENCV_MATCH_TOLERANCE:
+            level = "low"
+            description = "Borderline match"
+        else:
+            level = "no_match"
+            description = "No match"
+
+        confidence = 0
+        if distance <= OPENCV_MATCH_TOLERANCE:
+            ratio = max(0.0, 1.0 - (distance / OPENCV_MATCH_TOLERANCE))
+            confidence = int(max(0, min(100, round(ratio * 100))))
+
+        return {
+            "level": level,
+            "description": description,
+            "confidence_percent": confidence,
+            "distance": round(distance, 3),
+        }
+
+    confidence_levels = {
+        "high": (0.0, 0.35, "High confidence match"),
+        "medium": (0.35, 0.5, "Medium confidence match"),
+        "low": (0.5, 0.65, "Low confidence match"),
+        "no_match": (0.65, 1.01, "No match"),
+    }
+    for level, (min_d, max_d, desc) in confidence_levels.items():
         if min_d <= distance < max_d:
             confidence = max(0, min(100, int((1 - distance) * 100)))
             return {
