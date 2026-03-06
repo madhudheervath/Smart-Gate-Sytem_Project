@@ -1,6 +1,7 @@
 
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -1484,10 +1485,15 @@ def request_emergency_exit(
         "student_id": user.student_id
     }
 
-# Root endpoint
-@app.get("/")
-def root():
+# API info endpoint
+@app.get("/api")
+def api_root():
     return {"message": "GatePass QR System API", "version": "1.0"}
+
+
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+def root():
+    return RedirectResponse(url="/frontend/", status_code=307)
 
 
 @app.get("/healthz")
@@ -1572,26 +1578,5 @@ def get_public_location_settings():
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# Mount frontend directory
-app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
-
-# Add redirects for directory access to index.html
-@app.get("/frontend/parent/")
-async def parent_portal_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/frontend/parent/index.html")
-
-@app.get("/frontend/student/")
-async def student_portal_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/frontend/student/index.html")
-
-@app.get("/frontend/admin/")
-async def admin_portal_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/frontend/admin/index.html")
-
-@app.get("/frontend/guard/")
-async def guard_portal_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/frontend/guard/index.html")
+# Mount frontend directory with HTML mode so directory URLs resolve to index.html
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

@@ -128,11 +128,12 @@ Notes:
 2. Wait for the Docker build to finish.
 3. Open the service once the deploy succeeds.
 4. Check `https://your-service.onrender.com/healthz`.
-5. If that returns `{"status":"ok"}`, open:
-   - `https://your-service.onrender.com/frontend/admin/index.html`
-   - `https://your-service.onrender.com/frontend/student/index.html`
-   - `https://your-service.onrender.com/frontend/guard/index.html`
-   - `https://your-service.onrender.com/frontend/parent/index.html`
+5. Open `https://your-service.onrender.com/`. It should redirect to the frontend landing page.
+6. If that works, also test the direct portal URLs:
+   - `https://your-service.onrender.com/frontend/admin/`
+   - `https://your-service.onrender.com/frontend/student/`
+   - `https://your-service.onrender.com/frontend/guard/`
+   - `https://your-service.onrender.com/frontend/parent/`
 
 ## Step 6: First Production Validation
 

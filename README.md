@@ -264,17 +264,18 @@ Or use restart script:
 ```
 
 **Access:**
-- API: http://localhost:8080
+- Landing page: http://localhost:8080/
+- API info: http://localhost:8080/api
 - Docs: http://localhost:8080/docs
 
 ### Portals
 
 | Portal | URL | Purpose |
 |--------|-----|---------|
-| **Student** | `/frontend/student/index.html` | Request passes, view QR |
-| **Admin** | `/frontend/admin/index.html` | Approve passes, analytics |
-| **Guard** | `/frontend/guard/index.html` | Scan QR, verify faces |
-| **Parent** | `/frontend/parent/index.html` | View child activity |
+| **Student** | `/frontend/student/` | Request passes, view QR |
+| **Admin** | `/frontend/admin/` | Approve passes, analytics |
+| **Guard** | `/frontend/guard/` | Scan QR, verify faces |
+| **Parent** | `/frontend/parent/` | View child activity |
 
 ### Default Credentials
 
