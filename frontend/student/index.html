@@ -14,9 +14,9 @@
     <link rel="stylesheet" href="style.css?v=improved-utilities-v6">
 
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <script src="../common/config.js?v=20260306i"></script>
-    <script src="../common/utils.js?v=20260306i"></script>
-    <script src="../common/api.js?v=20260306i"></script>
+    <script src="../common/config.js?v=20260306k"></script>
+    <script src="../common/utils.js?v=20260306k"></script>
+    <script src="../common/api.js?v=20260306k"></script>
 </head>
 
 <body>
@@ -130,8 +130,8 @@
                     </div>
                     <div id="faceRegForm" style="margin-top:20px;">
                         <p style="margin-bottom:15px; opacity:0.95; line-height: 1.6;">Upload a clear, upright photo of
-                            your face for biometric verification at the gate. Use good lighting and make sure only one
-                            face is visible.</p>
+                            your face for biometric verification at the gate. Use good lighting, make sure only one
+                            face is visible, and allow a little extra time on the first cloud registration attempt.</p>
                         <input type="file" id="faceImage" accept="image/*" style="display:none;"
                             onchange="handleFaceImage(this)">
                         <label for="faceImage" class="btn"
@@ -141,7 +141,7 @@
                         <div id="imagePreview" style="margin-top:15px; display:none;">
                             <img id="previewImg"
                                 style="max-width:100%; border-radius:12px; border:3px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                            <button onclick="uploadFace()" class="btn"
+                            <button id="registerFaceBtn" onclick="uploadFace()" class="btn"
                                 style="background:white; color:#667eea; margin-top:10px; width:100%; font-weight: 700;">
                                 ✅ Register Face
                             </button>
@@ -347,7 +347,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260306i"></script>
+    <script src="app.js?v=20260306k"></script>
 </body>
 
 </html>

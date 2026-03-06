@@ -3,7 +3,7 @@ function isLocalhostHost(hostname) {
 }
 
 const RETRYABLE_STATUS_CODES = new Set([404, 405, 501, 502, 503, 504]);
-const DEFAULT_API_TIMEOUT_MS = 15000;
+const DEFAULT_API_TIMEOUT_MS = 30000;
 
 function getApiCandidates() {
     const host = window.location.hostname;
@@ -45,21 +45,22 @@ function createApiClient() {
         },
 
         async fetch(path, options = {}) {
+            const { timeoutMs = DEFAULT_API_TIMEOUT_MS, ...fetchOptions } = options;
             const candidates = [activeBase, ...getApiCandidates()].filter(Boolean);
             const uniqueCandidates = [...new Set(candidates)];
             let lastResponse = null;
             let lastError = null;
 
             for (const [index, base] of uniqueCandidates.entries()) {
-                const controller = options.signal ? null : new AbortController();
+                const controller = fetchOptions.signal ? null : new AbortController();
                 const timeoutId = controller
-                    ? window.setTimeout(() => controller.abort(), DEFAULT_API_TIMEOUT_MS)
+                    ? window.setTimeout(() => controller.abort(), timeoutMs)
                     : null;
 
                 try {
                     const response = await fetch(`${base}${path}`, {
-                        ...options,
-                        signal: controller ? controller.signal : options.signal
+                        ...fetchOptions,
+                        signal: controller ? controller.signal : fetchOptions.signal
                     });
                     const hasNextCandidate = index < uniqueCandidates.length - 1;
                     if (hasNextCandidate && RETRYABLE_STATUS_CODES.has(response.status)) {

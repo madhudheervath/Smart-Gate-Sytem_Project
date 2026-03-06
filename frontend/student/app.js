@@ -239,7 +239,7 @@ async function optimizeFaceImage(file) {
             img.src = sourceUrl;
         });
 
-        const maxDimension = 1280;
+        const maxDimension = 960;
         const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
         const width = Math.max(1, Math.round(image.naturalWidth * scale));
         const height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -259,7 +259,7 @@ async function optimizeFaceImage(file) {
             canvas.toBlob(
                 (result) => result ? resolve(result) : reject(new Error('Failed to prepare the image')),
                 'image/jpeg',
-                0.88
+                0.82
             );
         });
 
@@ -280,12 +280,27 @@ async function loadFaceStatus() {
         const faceStatusDiv = document.getElementById('faceStatus');
         const faceRegForm = document.getElementById('faceRegForm');
 
+        if (status.service_available === false) {
+            const reason = status.backend_error || 'Face service is not ready on this deployment.';
+            faceStatusDiv.innerHTML = `
+                <div style="background:rgba(255,255,255,0.15); padding:15px; border-radius:12px;">
+                    <p style="font-size:16px; font-weight:700;">⚠️ Face Service Unavailable</p>
+                    <p style="opacity:0.9; font-size:14px; margin-top:5px;">Backend: ${status.backend || 'unknown'}</p>
+                    <p style="opacity:0.9; font-size:14px; margin-top:5px;">${reason}</p>
+                </div>
+            `;
+            faceRegForm.style.display = 'none';
+            document.getElementById('faceRegCard').style.display = 'block';
+            return;
+        }
+
         if (status.face_registered) {
             const regDate = new Date(status.face_registered_at).toLocaleDateString();
             faceStatusDiv.innerHTML = `
                 <div style="background:rgba(255,255,255,0.2); padding:15px; border-radius:12px;">
                     <p style="font-size:18px; font-weight:700; margin-bottom:8px;">✅ Face Registered</p>
                     <p style="opacity:0.9;">Registered on: ${regDate}</p>
+                    <p style="opacity:0.9;">Backend: ${status.backend || 'default'}</p>
                     <p style="opacity:0.9; font-size:13px; margin-top:8px;">Your face is verified at gate entry for enhanced security.</p>
                 </div>
             `;
@@ -294,6 +309,7 @@ async function loadFaceStatus() {
             faceStatusDiv.innerHTML = `
                 <div style="background:rgba(255,255,255,0.15); padding:15px; border-radius:12px;">
                     <p style="font-size:16px; font-weight:600;">⚠️ Face Not Registered</p>
+                    <p style="opacity:0.9; font-size:14px; margin-top:5px;">Backend: ${status.backend || 'default'}</p>
                     <p style="opacity:0.9; font-size:14px; margin-top:5px;">Register your face for faster gate verification</p>
                 </div>
             `;
@@ -333,7 +349,14 @@ async function uploadFace() {
         return;
     }
 
+    const registerButton = document.getElementById('registerFaceBtn');
+    const originalLabel = registerButton ? registerButton.textContent : '';
+
     try {
+        if (registerButton) {
+            registerButton.disabled = true;
+            registerButton.textContent = '⏳ Registering Face...';
+        }
         const result = await FaceAPI.register(selectedFaceFile);
         alert('✅ ' + result.message);
 
@@ -347,6 +370,11 @@ async function uploadFace() {
 
     } catch (err) {
         alert('❌ ' + err.message);
+    } finally {
+        if (registerButton) {
+            registerButton.disabled = false;
+            registerButton.textContent = originalLabel || '✅ Register Face';
+        }
     }
 }
 
@@ -566,7 +594,11 @@ if (token) {
 
 // Auto-refresh passes every 10 seconds
 setInterval(() => {
-    if (token && document.getElementById('dashboardPage').classList.contains('active')) {
+    if (
+        token &&
+        document.visibilityState === 'visible' &&
+        document.getElementById('dashboardPage').classList.contains('active')
+    ) {
         loadPasses();
     }
 }, 10000);

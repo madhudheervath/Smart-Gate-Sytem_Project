@@ -25,6 +25,8 @@ services:
         value: "15"
       - key: FACE_AUTH_ENABLED
         value: "true"
+      - key: FACE_AUTH_BACKEND
+        value: "opencv"
       - key: NOTIFICATIONS_ENABLED
         value: "false"
       - key: GEOFENCE_ENABLED

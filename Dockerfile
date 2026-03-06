@@ -8,24 +8,18 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies required for dlib and opencv
-# cmake & g++ are strictly needed for building dlib from source
+# Install only the lightweight runtime dependencies needed by the server.
 RUN apt-get update && apt-get install -y \
     build-essential \
-    cmake \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgtk-3-dev \
+    libglib2.0-0 \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 # We copy requirements first to leverage Docker cache
 COPY backend/requirements.txt .
 
-# Increase timeout for dlib compilation & Reduce memory usage
-# Limit compilation to 1 thread to avoid OOM on free tier
-ENV CMAKE_BUILD_PARALLEL_LEVEL=1
+# Keep any fallback wheel build single-threaded to reduce memory pressure
 ENV MAX_JOBS=1
 
 RUN pip install --no-cache-dir --upgrade pip && \

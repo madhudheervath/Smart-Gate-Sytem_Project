@@ -657,7 +657,11 @@ if (token) {
 
 // Auto-refresh every 15 seconds
 setInterval(() => {
-    if (token && document.getElementById('dashboardPage').classList.contains('active')) {
+    if (
+        token &&
+        document.visibilityState === 'visible' &&
+        document.getElementById('dashboardPage').classList.contains('active')
+    ) {
         loadPasses();
         loadRegistrationRequests({ status: currentRegistrationFilter, notify: true });
     }

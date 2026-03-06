@@ -121,10 +121,11 @@ const API = {
     },
 
     // POST with form data
-    postForm: async (endpoint, formData) => {
+    postForm: async (endpoint, formData, options = {}) => {
         const token = API.getToken();
 
         const response = await API.fetchWithFallback(endpoint, {
+            ...options,
             method: 'POST',
             headers: {
                 'Authorization': token ? `Bearer ${token}` : undefined
@@ -332,7 +333,9 @@ const FaceAPI = {
         const formData = new FormData();
         formData.append('file', imageFile);
 
-        const response = await API.postForm('/api/register_face', formData);
+        const response = await API.postForm('/api/register_face', formData, {
+            timeoutMs: 120000
+        });
 
         if (!response.ok) {
             let errorMsg = 'Failed to register face';
@@ -350,7 +353,10 @@ const FaceAPI = {
     },
 
     getStatus: async () => {
-        const response = await API.get('/api/face_status');
+        const response = await API.request('/api/face_status', {
+            method: 'GET',
+            timeoutMs: 60000
+        });
 
         if (!response.ok) {
             throw new Error('Failed to get face status');
@@ -364,7 +370,9 @@ const FaceAPI = {
         formData.append('student_id', studentId);
         formData.append('file', imageFile);
 
-        const response = await API.postForm('/api/verify_face', formData);
+        const response = await API.postForm('/api/verify_face', formData, {
+            timeoutMs: 120000
+        });
 
         if (!response.ok) {
             let errorMsg = 'Verification failed';

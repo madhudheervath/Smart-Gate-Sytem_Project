@@ -100,6 +100,7 @@ SELF_REGISTRATION_ENABLED=false
 ACCOUNT_REQUESTS_ENABLED=true
 SMARTGATE_SEED_MODE=never
 FACE_AUTH_ENABLED=true
+FACE_AUTH_BACKEND=opencv
 NOTIFICATIONS_ENABLED=false
 GEOFENCE_ENABLED=true
 ```
@@ -118,7 +119,8 @@ Notes:
 - `SMARTGATE_SEED_MODE=never` avoids reseeding demo users into production data.
 - `ACCOUNT_REQUESTS_ENABLED=true` keeps the approval workflow active.
 - `SELF_REGISTRATION_ENABLED=false` prevents direct account creation.
-- `FACE_AUTH_ENABLED=true` is only useful if the Docker image builds the face stack successfully.
+- `FACE_AUTH_ENABLED=true` enables biometric registration and verification.
+- `FACE_AUTH_BACKEND=opencv` uses the lightweight backend intended for Render deployments.
 - `NOTIFICATIONS_ENABLED=false` is the safe default unless you also configure Firebase or Twilio.
 - Admins still get in-app request alerts in the dashboard UI even if push notifications stay off.
 

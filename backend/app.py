@@ -36,7 +36,7 @@ _face_auth_module = None
 _face_auth_import_error = None
 
 if FACE_AUTH_ENABLED:
-    print("✅ Face authentication enabled by configuration; face stack will load on demand")
+    print(f"✅ Face authentication enabled by configuration (backend={settings.FACE_AUTH_BACKEND}); face stack will load on demand")
 else:
     print("⚠️  Face authentication disabled by configuration")
 
@@ -88,7 +88,14 @@ def get_face_auth_module():
 
     try:
         _face_auth_module = importlib.import_module("face_auth")
-        print("✅ Face authentication module loaded successfully")
+        backend_name = getattr(_face_auth_module, "get_backend_name", lambda: settings.FACE_AUTH_BACKEND)()
+        backend_error = getattr(_face_auth_module, "get_backend_error", lambda: None)()
+        if backend_name:
+            print(f"✅ Face authentication module loaded successfully (backend={backend_name})")
+        elif backend_error:
+            _face_auth_import_error = backend_error
+            print(f"⚠️  Face authentication backend unavailable: {backend_error}")
+            return None
         return _face_auth_module
     except Exception as e:
         _face_auth_import_error = str(e)
@@ -1236,10 +1243,23 @@ if FACE_AUTH_ENABLED:
     @app.get("/api/face_status")
     def get_face_status(user: User = Depends(get_current_user)):
         """Get face registration status for current user"""
+        face_auth_module = get_face_auth_module()
+        backend = settings.FACE_AUTH_BACKEND
+        backend_error = _face_auth_import_error
+        service_available = False
+
+        if face_auth_module is not None:
+            backend = getattr(face_auth_module, "get_backend_name", lambda: settings.FACE_AUTH_BACKEND)() or backend
+            backend_error = getattr(face_auth_module, "get_backend_error", lambda: backend_error)()
+            service_available = backend_error is None
+
         return {
             "face_registered": user.face_registered,
             "face_registered_at": user.face_registered_at,
-            "can_register": user.role == "student"
+            "can_register": user.role == "student",
+            "service_available": service_available,
+            "backend": backend,
+            "backend_error": backend_error,
         }
 else:
     # Provide stub endpoints when face auth is disabled
@@ -1250,6 +1270,8 @@ else:
             "face_registered": False,
             "face_registered_at": None,
             "can_register": False,
+            "service_available": False,
+            "backend": settings.FACE_AUTH_BACKEND,
             "error": "Face authentication is disabled. Install face-recognition package to enable."
         }
 

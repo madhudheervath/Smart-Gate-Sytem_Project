@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     SELF_REGISTRATION_ENABLED: bool = False
     ACCOUNT_REQUESTS_ENABLED: bool = True
     FACE_AUTH_ENABLED: bool = True
+    FACE_AUTH_BACKEND: str = "opencv"
     NOTIFICATIONS_ENABLED: bool = False
     GEOFENCE_ENABLED: bool = True
 
