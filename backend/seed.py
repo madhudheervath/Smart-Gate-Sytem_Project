@@ -4,10 +4,10 @@ from auth import hash_pwd
 
 DEMO_USERS = [
     ("Admin Warden", "admin@uni.edu", "admin", "admin123", None),
-    ("Madhavi", "u22cn361@cmrtc.ac.in", "student", "madhavi123", "U22CN361"),
-    ("Dhanush", "u22cn362@cmrtc.ac.in", "student", "dhanush123", "U22CN362"),
-    ("Gowrishankar", "u22cn414@cmrtc.ac.in", "student", "gowri123", "U22CN414"),
-    ("Tharun", "u22cn421@cmrtc.ac.in", "student", "tharun123", "U22CN421"),
+    ("Alice Chen", "alice@uni.edu", "student", "alice123", "S1001"),
+    ("Bob Müller", "bob@uni.edu", "student", "bob123", "S1002"),
+    ("Carol Osei", "carol@uni.edu", "student", "carol123", "S1003"),
+    ("David Pham", "david@uni.edu", "student", "david123", "S1004"),
     ("Gate Guard", "guard@uni.edu", "guard", "guard123", None),
     ("Gate Scanner", "scanner@uni.edu", "guard", "scanner123", None),
 ]

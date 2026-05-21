@@ -102,7 +102,7 @@ const CONFIG = {
     FEATURES: {
         OFFLINE_MODE: true,
         DARK_MODE: true,
-        ANALYTICS: false,
+        ANALYTICS: true,
         PWA: true,
         SELF_REGISTRATION: false,
         ACCOUNT_REQUESTS: true,

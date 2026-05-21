@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 from passlib.hash import bcrypt
 from fastapi import HTTPException, status, Depends
@@ -18,14 +18,14 @@ def verify_pwd(p: str, h: str) -> bool:
 
 def create_access_token(data: dict, minutes: int = settings.ACCESS_TOKEN_EXPIRE_MINUTES):
     to_encode = data.copy()
-    to_encode["exp"] = datetime.utcnow() + timedelta(minutes=minutes)
+    to_encode["exp"] = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
 def create_parent_access_token(student_id: str, minutes: int = settings.PARENT_ACCESS_TOKEN_EXPIRE_MINUTES):
     payload = {
         "student_id": student_id,
         "scope": "parent_portal",
-        "exp": datetime.utcnow() + timedelta(minutes=minutes),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes),
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 

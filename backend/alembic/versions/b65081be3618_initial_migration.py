@@ -57,6 +57,9 @@ def upgrade() -> None:
             "request_longitude": lambda: sa.Column("request_longitude", sa.Text(), nullable=True),
             "location_verified": lambda: sa.Column("location_verified", sa.Boolean(), nullable=True, server_default=sa.false()),
             "location_distance_km": lambda: sa.Column("location_distance_km", sa.Text(), nullable=True),
+            "slot_id": lambda: sa.Column("slot_id", sa.Integer(), nullable=True),
+            "access_mode": lambda: sa.Column("access_mode", sa.String(length=20), nullable=True, server_default=sa.text("'standard'")),
+            "requires_face_check": lambda: sa.Column("requires_face_check", sa.Boolean(), nullable=True, server_default=sa.false()),
         },
         "scan_logs": {
             "pass_type": lambda: sa.Column("pass_type", sa.String(length=10), nullable=True, server_default=sa.text("'entry'")),

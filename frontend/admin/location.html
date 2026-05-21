@@ -5,30 +5,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Location Settings - Access Control Administrator Portal</title>
-    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../common/styles.css?v=20260519c">
 
     <!-- Leaflet CSS for map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
+        .live-bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.18;
+        }
+
+        body > :not(.live-bg-canvas):not(script) {
+            position: relative;
+            z-index: 1;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .live-bg-canvas { display: none; }
+        }
+
         .location-container {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
+            width: min(calc(100% - var(--page-gutter) * 2), var(--page-max));
+            margin: 0 auto;
+            padding: clamp(1rem, 2vw, 2rem) 0 4rem;
         }
 
         .settings-card {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            background: var(--bg-surface);
+            border: 1px solid var(--role-border);
+            border-radius: var(--radius-md);
+            padding: clamp(1.25rem, 2vw, 2rem);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
             margin-bottom: 20px;
+            backdrop-filter: blur(18px);
         }
 
         .settings-card h2 {
             margin-top: 0;
-            color: #667eea;
-            font-size: 24px;
+            color: var(--accent-h);
+            font-size: clamp(1.15rem, 1.6vw, 1.35rem);
             margin-bottom: 20px;
         }
 
@@ -36,30 +58,49 @@
             margin-bottom: 20px;
         }
 
+        #locationForm {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 1rem;
+            row-gap: 1.1rem;
+        }
+
+        #locationForm .form-group {
+            margin-bottom: 0;
+        }
+
+        #locationForm .form-group:first-child,
+        #locationForm > div:last-child {
+            grid-column: 1 / -1;
+        }
+
         .form-group label {
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
-            color: #333;
+            color: var(--text-2);
         }
 
         .form-group input {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
+            background: rgba(5, 12, 24, 0.74);
+            border: 1px solid var(--border-em);
+            border-radius: var(--radius-sm);
+            color: var(--text-1);
+            font-size: 0.95rem;
             transition: border 0.3s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-ring);
         }
 
         .form-group .help-text {
             font-size: 13px;
-            color: #666;
+            color: var(--text-3);
             margin-top: 5px;
         }
 
@@ -107,7 +148,7 @@
         }
 
         input:checked+.slider {
-            background-color: #667eea;
+            background-color: var(--accent);
         }
 
         input:checked+.slider:before {
@@ -115,29 +156,31 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             color: white;
             padding: 14px 30px;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            box-shadow: 0 10px 24px var(--role-shadow);
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            background: var(--accent-h);
+            transform: none;
+            box-shadow: 0 0 0 3px var(--accent-ring);
         }
 
         .btn-secondary {
-            background: #6c757d;
-            color: white;
+            background: var(--bg-raised);
+            color: var(--text-2);
             padding: 14px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
+            border: 1px solid var(--role-border);
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
@@ -145,15 +188,18 @@
         }
 
         .btn-secondary:hover {
-            background: #5a6268;
+            background: var(--bg-muted);
+            color: var(--text-1);
         }
 
         .current-location {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
+            background: var(--bg-surface);
+            color: var(--text-1);
+            padding: clamp(1.25rem, 2vw, 1.75rem);
+            border: 1px solid var(--role-border);
+            border-radius: var(--radius-md);
             margin-bottom: 20px;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
         }
 
         .current-location h3 {
@@ -163,14 +209,15 @@
 
         .location-info {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
             gap: 15px;
         }
 
         .location-item {
-            background: rgba(255, 255, 255, 0.2);
+            background: var(--bg-raised);
+            border: 1px solid var(--role-border);
             padding: 12px;
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
         }
 
         .location-item .label {
@@ -187,20 +234,21 @@
         #map {
             width: 100%;
             height: 400px;
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             margin-top: 20px;
-            border: 2px solid #e0e0e0;
+            border: 1px solid var(--role-border);
             z-index: 1;
         }
 
         .map-info {
             text-align: center;
             padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             margin-top: 10px;
             font-size: 14px;
-            color: #666;
+            color: var(--text-2);
         }
 
         .alert {
@@ -225,7 +273,7 @@
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
-            color: #667eea;
+            color: var(--accent-h);
             text-decoration: none;
             font-weight: 600;
         }
@@ -233,10 +281,21 @@
         .back-link:hover {
             text-decoration: underline;
         }
+
+        @media (max-width: 760px) {
+            .location-container { width: min(calc(100% - 1rem), var(--page-max)); }
+            #locationForm { grid-template-columns: 1fr; }
+            #locationForm .form-group:first-child,
+            #locationForm > div:last-child { grid-column: auto; }
+            .btn-primary,
+            .btn-secondary { width: 100%; margin-left: 0; margin-top: 0.5rem; }
+            #map { height: 320px; }
+        }
     </style>
 </head>
 
-<body>
+<body class="theme-admin">
+    <canvas id="particleCanvas" class="live-bg-canvas" aria-hidden="true"></canvas>
     <div class="location-container">
         <a href="index.html" class="back-link">← Back to Dashboard</a>
 
@@ -374,6 +433,7 @@
     <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="../common/config.js?v=20260306k"></script>
+    <script src="../common/video-bg.js?v=20260519b"></script>
 
     <script>
         let token = localStorage.getItem('adminToken');

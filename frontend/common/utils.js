@@ -293,11 +293,119 @@ function debounce(func, wait = 500) {
     };
 }
 
+// ==================== DATE / TIMEZONE HELPERS ====================
+const DateTimeHelper = {
+    browserTimeZone: () => {
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
+        } catch (e) {
+            return 'Local time';
+        }
+    },
+
+    utcOffsetLabel: (date = new Date()) => {
+        const offsetMinutes = -date.getTimezoneOffset();
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const abs = Math.abs(offsetMinutes);
+        const hours = String(Math.floor(abs / 60)).padStart(2, '0');
+        const minutes = String(abs % 60).padStart(2, '0');
+        return `UTC${sign}${hours}:${minutes}`;
+    },
+
+    zoneLabel: () => `${DateTimeHelper.browserTimeZone()} (${DateTimeHelper.utcOffsetLabel()})`,
+
+    parseBackendDate: (value) => {
+        if (!value) return null;
+        if (value instanceof Date) return value;
+        if (typeof value === 'number') return new Date(value);
+
+        const raw = String(value).trim();
+        if (!raw) return null;
+
+        const hasTime = raw.includes('T');
+        const hasZone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(raw);
+        const normalized = hasTime && !hasZone ? `${raw}Z` : raw;
+        const date = new Date(normalized);
+        return Number.isNaN(date.getTime()) ? null : date;
+    },
+
+    formatLocal: (value, options = {}) => {
+        const date = DateTimeHelper.parseBackendDate(value);
+        if (!date) return 'N/A';
+        return new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            ...options
+        }).format(date);
+    },
+
+    formatTime: (value, options = {}) => {
+        const date = DateTimeHelper.parseBackendDate(value);
+        if (!date) return 'N/A';
+        return new Intl.DateTimeFormat(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+            ...options
+        }).format(date);
+    },
+
+    sameLocalDate: (a, b) => (
+        a && b &&
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+    ),
+
+    formatSlotWindow: (startValue, endValue) => {
+        const start = DateTimeHelper.parseBackendDate(startValue);
+        const end = DateTimeHelper.parseBackendDate(endValue);
+        if (!start || !end) return 'N/A';
+
+        const dateLabel = new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }).format(start);
+        const startTime = DateTimeHelper.formatTime(start);
+        const endTime = DateTimeHelper.formatTime(end);
+
+        if (DateTimeHelper.sameLocalDate(start, end)) {
+            return `${dateLabel} · ${startTime} to ${endTime}`;
+        }
+
+        return `${DateTimeHelper.formatLocal(start)} to ${DateTimeHelper.formatLocal(end)}`;
+    },
+
+    toLocalInputValue: (date) => {
+        const d = date instanceof Date ? date : new Date(date);
+        if (Number.isNaN(d.getTime())) return '';
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    },
+
+    fromLocalInputValue: (value) => {
+        if (!value) return null;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+    },
+
+    roundUpMinutes: (date = new Date(), minutes = 15) => {
+        const ms = minutes * 60 * 1000;
+        return new Date(Math.ceil(date.getTime() / ms) * ms);
+    }
+};
+
+window.DateTimeHelper = DateTimeHelper;
+
 // ==================== FORMAT HELPERS ====================
 const Format = {
     date: (dateString) => {
         if (!dateString) return 'N/A';
-        const date = new Date(dateString);
+        const date = DateTimeHelper.parseBackendDate(dateString);
+        if (!date) return 'N/A';
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -307,7 +415,8 @@ const Format = {
     
     time: (dateString) => {
         if (!dateString) return 'N/A';
-        const date = new Date(dateString);
+        const date = DateTimeHelper.parseBackendDate(dateString);
+        if (!date) return 'N/A';
         return date.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit'
@@ -322,7 +431,9 @@ const Format = {
     timeAgo: (dateString) => {
         if (!dateString) return 'N/A';
         
-        const seconds = Math.floor((new Date() - new Date(dateString)) / 1000);
+        const date = DateTimeHelper.parseBackendDate(dateString);
+        if (!date) return 'N/A';
+        const seconds = Math.floor((new Date() - date) / 1000);
         
         let interval = seconds / 31536000;
         if (interval > 1) return Math.floor(interval) + " years ago";
@@ -375,6 +486,7 @@ if (typeof module !== 'undefined' && module.exports) {
         TokenManager,
         APIHelper,
         debounce,
+        DateTimeHelper,
         Format,
         OfflineManager
     };

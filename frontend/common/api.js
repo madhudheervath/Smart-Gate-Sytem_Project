@@ -225,11 +225,14 @@ const AuthAPI = {
 };
 
 const PassAPI = {
-    request: async (passType, reason, location = null) => {
+    request: async (passType, reason, location = null, options = {}) => {
         const payload = {
             pass_type: passType,
             reason: reason
         };
+        if (options.slot_id) {
+            payload.slot_id = options.slot_id;
+        }
         if (location) {
             payload.latitude = location.latitude;
             payload.longitude = location.longitude;
@@ -363,6 +366,25 @@ const FaceAPI = {
         }
 
         return await response.json();
+    },
+
+    getPreviewUrl: async () => {
+        const response = await API.request(`/api/face_preview?ts=${Date.now()}`, {
+            method: 'GET',
+            timeoutMs: 60000,
+            headers: {}
+        });
+
+        if (response.status === 404) {
+            return null;
+        }
+
+        if (!response.ok) {
+            throw new Error('Failed to load face preview');
+        }
+
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
     },
 
     verify: async (studentId, imageFile) => {

@@ -1,159 +1,702 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Access Control Administrator Portal - GatePass</title>
-    <link rel="stylesheet" href="style.css?v=2025">
-</head>
+    <title>SecureGate — Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../common/styles.css?v=20260521a">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        .page { display: none; }
+        .page.active { display: block; }
 
-<body>
-    <!-- Login Page -->
+        /* ── Admin shell ── */
+        .admin-shell {
+            display: flex;
+            min-height: calc(100dvh - 56px);
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: clamp(210px, 14vw, 260px);
+            flex-shrink: 0;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 56px;
+            height: calc(100vh - 56px);
+            overflow-y: auto;
+        }
+        .sidebar-section-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-3);
+            padding: 0 1.25rem;
+            margin: 1rem 0 0.375rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        /* admin-nav + nav-btn — JS uses these class names */
+        .admin-nav { display: contents; }
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            width: 100%;
+            padding: 0.55rem 1.25rem;
+            background: none;
+            border: none;
+            color: var(--text-2);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 400;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 0;
+            transition: background .15s, color .15s;
+            white-space: nowrap;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .nav-btn:hover  { background: var(--bg-raised); color: var(--text-1); }
+        .nav-btn.active { background: var(--accent-bg); color: var(--accent-h); font-weight: 500; box-shadow: inset 3px 0 0 var(--accent); }
+        .nav-btn .nav-icon { font-size: 0.9rem; opacity: .7; }
+
+        /* ── Content area ── */
+        .admin-content {
+            flex: 1;
+            min-width: 0;
+            padding: clamp(1.25rem, 2vw, 2rem) var(--page-gutter-wide) 4rem;
+            overflow-x: hidden;
+        }
+
+        /* ── Content panels ── */
+        .panel { display: none; animation: fadein .2s ease; }
+        .panel.active { display: block; }
+        @keyframes fadein { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+        /* ── Page header ── */
+        .content-header {
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .content-header h1 { font-size: 1.2rem; font-weight: 600; }
+        .content-header p  { font-size: 0.82rem; color: var(--text-3); margin-top: 0.15rem; }
+
+        /* ── List items (pass/clearance) ── */
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.875rem 1rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            transition: background .15s;
+        }
+        .list-item:hover { background: var(--bg-muted); }
+        @media (max-width: 680px) { .list-item { flex-direction: column; align-items: flex-start; } }
+        .item-info h4    { font-size: 0.88rem; font-weight: 600; color: var(--text-1); margin-bottom: 0.15rem; }
+        .item-info p     { font-size: 0.78rem; color: var(--text-3); margin: 0; }
+        .item-actions    { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+        /* ── Filters row ── */
+        .filters-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .filters-row input  { flex: 2; min-width: 160px; }
+        .filters-row select { flex: 1; min-width: 120px; }
+
+        /* ── Two-column form + result ── */
+        .form-result-grid {
+            display: grid;
+            grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+            gap: clamp(1rem, 2vw, 2rem);
+            align-items: start;
+        }
+        @media (max-width: 900px) { .form-result-grid { grid-template-columns: 1fr; } }
+
+        /* ── Form panel (slot / visitor) ── */
+        .form-panel {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
+        }
+        .form-panel h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 1.25rem; }
+
+        .slot-timezone-note {
+            display: grid;
+            gap: 0.25rem;
+            margin-bottom: 1rem;
+            padding: 0.8rem 0.9rem;
+            border: 1px solid var(--role-border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+        }
+        .slot-timezone-note span,
+        .field-hint,
+        .slot-timezone-note small {
+            color: var(--text-3);
+            font-size: 0.74rem;
+        }
+        .slot-timezone-note strong {
+            color: var(--text-1);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .field-hint {
+            display: block;
+            min-height: 1rem;
+            margin-top: 0.3rem;
+        }
+        .slot-quick-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+            margin: 0.25rem 0 0.875rem;
+        }
+        .slot-quick-row .btn {
+            min-height: 2.15rem;
+            white-space: normal;
+        }
+        .slot-window-preview {
+            min-height: 3rem;
+            margin-bottom: 0.875rem;
+            padding: 0.8rem 0.9rem;
+            border: 1px dashed var(--border-em);
+            border-radius: var(--radius-sm);
+            color: var(--text-2);
+            background: rgba(5, 12, 24, 0.36);
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+        .slot-window-preview strong {
+            display: block;
+            color: var(--text-1);
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+        .slot-window-preview.error {
+            border-color: rgba(248,113,113,.45);
+            color: var(--danger);
+            background: var(--danger-bg);
+        }
+
+        /* ── QR result box ── */
+        .qr-result-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+        .qr-white-bg { background:#fff; padding:.875rem; border-radius:var(--radius-sm); margin-bottom:1rem; }
+
+        /* ── Checkbox rows in forms ── */
+        .check-label {
+            display: flex;
+            gap: 0.6rem;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-2);
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+        }
+        .check-label input[type="checkbox"] {
+            width: 1.15rem;
+            min-width: 1.15rem;
+            height: 1.15rem;
+            padding: 0;
+            accent-color: var(--accent);
+        }
+
+        /* ── Grid form (modal) ── */
+        .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.875rem; }
+        .grid-form .full-width { grid-column: 1 / -1; }
+
+        /* ── Request notification banner ── */
+        #requestNotificationBanner {
+            background: var(--warning-bg);
+            border: 1px solid rgba(251,191,36,.2);
+            border-left: 3px solid var(--warning);
+            color: var(--warning);
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius-sm);
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            font-size: 0.85rem;
+        }
+
+        /* ── Tables ── */
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        thead th {
+            text-align: left;
+            padding: 0.6rem 0.875rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-3);
+            text-transform: none;
+            letter-spacing: 0;
+            border-bottom: 1px solid var(--border);
+            font-family: inherit;
+        }
+        tbody td { padding: 0.7rem 0.875rem; border-bottom: 1px solid var(--border); color: var(--text-1); vertical-align: middle; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: rgba(255,255,255,.025); }
+
+        /* ── Slot items list ── */
+        .slot-item {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.875rem 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .slot-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+        .slot-item-header h4 { font-size: .88rem; font-weight: 600; }
+
+        /* ── Overview section ── */
+        #overview-panel .greeting { font-size: 1rem; font-weight: 500; color: var(--text-1); margin-bottom: .25rem; }
+        #overview-panel .greeting span { color: var(--text-3); font-weight: 400; font-size: .85rem; }
+
+        /* ── Mobile sidebar toggle ── */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .admin-content { padding: 1.25rem 1rem 3rem; }
+            .form-result-grid { grid-template-columns: 1fr; }
+            .grid-form { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body class="theme-admin">
+    <canvas id="particleCanvas" class="live-bg-canvas" aria-hidden="true"></canvas>
+
+    <!-- ═══ LOGIN PAGE ═══ -->
     <div id="loginPage" class="page active">
-        <div class="container">
-            <div class="card">
-                <h1>🛡️ Access Control Administrator Portal</h1>
-                <h2>Login</h2>
+        <nav class="topnav">
+            <span class="topnav-brand">SecureGate</span>
+            <span class="topnav-subtitle">Administration</span>
+            <div class="topnav-end">
+                <a href="../index.html" class="nav-text-link btn btn-ghost btn-sm">← Hub</a>
+            </div>
+        </nav>
+        <div class="auth-wrap">
+            <div class="auth-box">
+                <div style="margin-bottom:1.75rem;">
+                    <h1 class="auth-title">Admin sign in</h1>
+                    <p class="auth-subtitle">Restricted to authorized administrators</p>
+                </div>
                 <form id="loginForm">
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" placeholder="Enter admin email" required>
+                    <div class="field">
+                        <label for="email">Email address</label>
+                        <input type="email" id="email" placeholder="admin@campus.edu" required>
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="password">Password</label>
-                        <input type="password" id="password" placeholder="Enter password" required>
+                        <input type="password" id="password" placeholder="••••••••" required>
                     </div>
-                    <div id="loginError" class="error"></div>
-                    <button type="submit" class="btn btn-primary">Login</button>
+                    <div id="loginError" style="display:none;" class="alert alert-error mt-2 mb-2"></div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top:.5rem;">Sign in</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Dashboard Page -->
+    <!-- ═══ DASHBOARD PAGE ═══ -->
     <div id="dashboardPage" class="page">
-        <div class="navbar">
-            <div class="nav-content">
-                <h1>🛡️ Access Control Administrator Dashboard</h1>
-                <div class="nav-right">
-                    <span id="userName" class="user-name"></span>
-                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
-                </div>
-            </div>
-        </div>
 
-        <div class="container">
-            <!-- Quick Actions -->
-            <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
-                <a href="logs.html" class="btn btn-primary"
-                    style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-                    📊 View Real-Time Logs & Analytics
-                </a>
-                <a href="location.html" class="btn btn-primary"
-                    style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                    📍 Configure Campus Location
-                </a>
+        <!-- Top nav -->
+        <nav class="topnav">
+            <a href="../index.html" class="topnav-brand">SecureGate</a>
+            <span class="topnav-subtitle">Administration</span>
+            <div class="topnav-end">
+                <a href="logs.html" target="_blank" class="nav-text-link btn btn-ghost btn-sm">Scan logs</a>
+                <a href="location.html" target="_blank" class="nav-text-link btn btn-ghost btn-sm">GPS settings</a>
+                <span id="userName" style="font-size:.82rem;color:var(--text-2);padding:0 .5rem;"></span>
+                <button onclick="logout()" class="btn btn-ghost btn-sm">Sign out</button>
             </div>
+        </nav>
 
-            <!-- Stats Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number" id="registrationPendingCount">0</div>
-                    <div class="stat-label">Pending Account Requests</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="pendingCount">0</div>
-                    <div class="stat-label">Pending Requests</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="approvedCount">0</div>
-                    <div class="stat-label">Approved Today</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalApprovedCount">0</div>
-                    <div class="stat-label">Total Approved</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="usedCount">0</div>
-                    <div class="stat-label">Used Passes</div>
-                </div>
-            </div>
+        <div class="admin-shell">
 
-            <div class="card">
-                <div class="filter-bar">
-                    <h2 style="margin: 0;">Account Registration Requests</h2>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; align-items:center;">
-                        <button class="filter-btn request-filter-btn active" data-request-status="pending"
-                            onclick="filterRegistrationRequests('pending')">
-                            ⏳ Pending
-                        </button>
-                        <button class="filter-btn request-filter-btn" data-request-status="approved"
-                            onclick="filterRegistrationRequests('approved')">
-                            ✅ Approved
-                        </button>
-                        <button class="filter-btn request-filter-btn" data-request-status="rejected"
-                            onclick="filterRegistrationRequests('rejected')">
-                            ❌ Rejected
-                        </button>
-                        <button class="filter-btn request-filter-btn" data-request-status="all"
-                            onclick="filterRegistrationRequests('all')">
-                            📋 All
-                        </button>
-                        <button class="btn btn-secondary" id="enableAdminAlertsBtn" onclick="enableAdminBrowserAlerts()">
-                            🔔 Enable Browser Alerts
-                        </button>
-                        <button class="btn btn-secondary" onclick="refreshRegistrationRequests()">
-                        🔄 Refresh Requests
-                        </button>
+            <!-- ══ SIDEBAR ══ -->
+            <aside class="sidebar">
+                <div class="sidebar-section-label">Overview</div>
+                <!-- JS uses .admin-nav .nav-btn (indexed 0–4) — order matters -->
+                <nav class="admin-nav">
+                    <button class="nav-btn active" onclick="switchTab('clearances')">
+                        <span class="nav-icon">📋</span> Account clearances
+                    </button>
+                    <button class="nav-btn" onclick="switchTab('passes')">
+                        <span class="nav-icon">🎫</span> Gate passes
+                    </button>
+                    <button class="nav-btn" onclick="switchTab('users')">
+                        <span class="nav-icon">👥</span> Users
+                    </button>
+                    <button class="nav-btn" onclick="switchTab('slots')">
+                        <span class="nav-icon">🕐</span> Schedule slots
+                    </button>
+                    <button class="nav-btn" onclick="switchTab('visitors')">
+                        <span class="nav-icon">🪪</span> Visitor passes
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- ══ CONTENT ══ -->
+            <main class="admin-content">
+
+                <!-- Request banner -->
+                <div id="requestNotificationBanner" style="display:none;">
+                    <div><strong>Attention:</strong> <span id="requestNotificationMessage">New requests pending</span></div>
+                    <button onclick="loadAdminData()" class="btn btn-sm" style="border:1px solid var(--warning);color:var(--warning);background:none;">Review</button>
+                </div>
+                <div id="requestAlertStatus" style="display:none;"></div>
+
+                <!-- ── Stats strip ── -->
+                <div class="stat-strip">
+                    <div class="stat-pill yellow">
+                        <div class="pill-value" id="registrationPendingCount">0</div>
+                        <div class="pill-label">Pending clearances</div>
+                    </div>
+                    <div class="stat-pill red">
+                        <div class="pill-value" id="pendingCount">0</div>
+                        <div class="pill-label">Pending passes</div>
+                    </div>
+                    <div class="stat-pill green">
+                        <div class="pill-value" id="approvedCount">0</div>
+                        <div class="pill-label">Active passes</div>
+                    </div>
+                    <div class="stat-pill cyan">
+                        <div class="pill-value" id="totalApprovedCount">0</div>
+                        <div class="pill-label">Total handled</div>
+                    </div>
+                    <div class="stat-pill muted">
+                        <div class="pill-value" id="usedCount">0</div>
+                        <div class="pill-label">Archived</div>
                     </div>
                 </div>
-                <div id="requestNotificationBanner"
-                    style="display:none; margin:16px 0; padding:14px 16px; border-radius:10px;">
-                    <strong style="display:block; margin-bottom:4px;">Account Request Notification</strong>
-                    <span id="requestNotificationMessage"></span>
-                </div>
-                <p id="requestAlertStatus" style="margin: 0 0 12px 0; color:#666; font-size:14px;"></p>
-                <div id="registrationRequestsContainer"></div>
-            </div>
 
-            <!-- Filters -->
-            <div class="card">
-                <div class="filter-bar">
-                    <button class="filter-btn pass-filter-btn active" data-status="pending" onclick="filterPasses('pending')">
-                        ⏳ Pending
-                    </button>
-                    <button class="filter-btn pass-filter-btn" data-status="approved" onclick="filterPasses('approved')">
-                        ✅ Approved
-                    </button>
-                    <button class="filter-btn pass-filter-btn" data-status="rejected" onclick="filterPasses('rejected')">
-                        ❌ Rejected
-                    </button>
-                    <button class="filter-btn pass-filter-btn" data-status="used" onclick="filterPasses('used')">
-                        🚪 Used
-                    </button>
-                    <button class="filter-btn pass-filter-btn" data-status="" onclick="filterPasses('')">
-                        📋 All
-                    </button>
-                    <button class="btn btn-secondary" onclick="loadPasses()" style="margin-left: auto;">
-                        🔄 Refresh
-                    </button>
+                <!-- ──────────────────────────────────── -->
+                <!-- PANEL: Account Clearances            -->
+                <!-- ──────────────────────────────────── -->
+                <div id="clearances-panel" class="panel active">
+                    <div class="content-header">
+                        <div>
+                            <h1>Account clearances</h1>
+                            <p>Review and approve registration requests</p>
+                        </div>
+                        <button onclick="loadAdminData()" class="btn btn-secondary btn-sm">Refresh</button>
+                    </div>
+                    <div id="registrationRequestsContainer">
+                        <p style="color:var(--text-3);padding:2rem 0;text-align:center;font-size:.85rem;">No pending clearance requests.</p>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Pass Requests -->
-            <div class="card">
-                <h2>Pass Requests</h2>
-                <div id="passesContainer"></div>
-            </div>
+                <!-- ──────────────────────────────────── -->
+                <!-- PANEL: Gate Pass Approvals           -->
+                <!-- ──────────────────────────────────── -->
+                <div id="passes-panel" class="panel">
+                    <div class="content-header">
+                        <div>
+                            <h1>Gate pass approvals</h1>
+                            <p>Approve or reject pending pass requests</p>
+                        </div>
+                        <button onclick="loadAdminData()" class="btn btn-secondary btn-sm">Refresh</button>
+                    </div>
+                    <div id="passesContainer">
+                        <p style="color:var(--text-3);padding:2rem 0;text-align:center;font-size:.85rem;">No active pass requests.</p>
+                    </div>
+                </div>
+
+                <!-- ──────────────────────────────────── -->
+                <!-- PANEL: User Management               -->
+                <!-- ──────────────────────────────────── -->
+                <div id="usersPanel" class="panel">
+                    <div class="content-header">
+                        <div>
+                            <h1>Users</h1>
+                            <p>Manage all system accounts</p>
+                        </div>
+                        <button onclick="openUserModal()" class="btn btn-primary btn-sm">+ Add user</button>
+                    </div>
+                    <div class="filters-row">
+                        <input type="text" id="userSearchInput" placeholder="Search by name or email…">
+                        <select id="userRoleFilter">
+                            <option value="">All roles</option>
+                            <option value="student">Student</option>
+                            <option value="guard">Guard</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <select id="userActiveFilter">
+                            <option value="">All status</option>
+                            <option value="true">Active</option>
+                            <option value="false">Inactive</option>
+                        </select>
+                    </div>
+                    <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow-x:auto;" id="usersTableContainer">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ──────────────────────────────────── -->
+                <!-- PANEL: Schedule Slots                -->
+                <!-- ──────────────────────────────────── -->
+                <div id="slotPanel" class="panel">
+                    <div class="content-header">
+                        <div>
+                            <h1>Schedule slots</h1>
+                            <p>Create and manage time-windowed access slots</p>
+                        </div>
+                    </div>
+                    <div class="form-result-grid">
+                        <!-- Create form -->
+                        <div class="form-panel">
+                            <h3>Create a new slot</h3>
+                            <form id="slotForm" onsubmit="createSlot(event)">
+                                <div class="slot-timezone-note">
+                                    <span>Local timezone</span>
+                                    <strong id="slotTimezoneLabel">Detecting...</strong>
+                                    <small>Times are saved safely and shown in each user's browser timezone.</small>
+                                </div>
+                                <div class="field">
+                                    <label for="slotLabel">Title</label>
+                                    <input type="text" id="slotLabel" placeholder="e.g. Morning rush" required>
+                                </div>
+                                <div class="field">
+                                    <label for="slotGate">Gate</label>
+                                    <input type="text" id="slotGate" placeholder="e.g. Main Gate" required>
+                                </div>
+                                <div class="field">
+                                    <label for="slotStart">Start time</label>
+                                    <input type="datetime-local" id="slotStart" step="900" required>
+                                    <small class="field-hint" id="slotStartHint"></small>
+                                </div>
+                                <div class="field">
+                                    <label for="slotEnd">End time</label>
+                                    <input type="datetime-local" id="slotEnd" step="900" required>
+                                    <small class="field-hint" id="slotEndHint"></small>
+                                </div>
+                                <div class="slot-quick-row" aria-label="Quick slot time choices">
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="setSlotPreset('next-hour')">Next hour</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="setSlotPreset('morning')">Tomorrow 9-11</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="setSlotPreset('evening')">Today 4-6</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="extendSlotDuration(30)">+30 min</button>
+                                </div>
+                                <div class="slot-window-preview" id="slotWindowPreview">
+                                    Select a start and end time to preview the slot window.
+                                </div>
+                                <div class="field">
+                                    <label for="slotCapacity">Capacity</label>
+                                    <input type="number" id="slotCapacity" min="1" placeholder="e.g. 50" required>
+                                </div>
+                                <div style="margin-bottom:1rem;">
+                                    <label class="check-label">
+                                        <input type="checkbox" id="slotGpsReq"> Require geofence check
+                                    </label>
+                                    <label class="check-label">
+                                        <input type="checkbox" id="slotFaceReq"> Require biometric check
+                                    </label>
+                                </div>
+                                <div id="slotError" style="display:none;" class="alert alert-error mb-2"></div>
+                                <button type="submit" class="btn btn-primary btn-full">Create slot</button>
+                            </form>
+                        </div>
+                        <!-- Active slots -->
+                        <div>
+                            <h3 style="font-size:.9rem;font-weight:600;margin-bottom:1rem;color:var(--text-2);">Active schedule</h3>
+                            <div id="slotsListContainer" style="max-height:560px;overflow-y:auto;">
+                                <p style="color:var(--text-3);text-align:center;padding:2rem 0;font-size:.85rem;">No slots defined yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ──────────────────────────────────── -->
+                <!-- PANEL: Visitor Passes                -->
+                <!-- ──────────────────────────────────── -->
+                <div id="visitors-panel" class="panel">
+                    <div class="content-header">
+                        <div>
+                            <h1>Visitor passes</h1>
+                            <p>Generate one-time access tokens for visitors</p>
+                        </div>
+                    </div>
+                    <div class="form-result-grid">
+                        <!-- Visitor form -->
+                        <div class="form-panel" id="visitorPassModal">
+                            <h3>Generate visitor pass</h3>
+                            <form onsubmit="generateVisitorPass(event)">
+                                <div class="field">
+                                    <label for="vpName">Visitor full name</label>
+                                    <input type="text" id="vpName" placeholder="First Last" required>
+                                </div>
+                                <div class="field">
+                                    <label for="vpPhone">Contact number</label>
+                                    <input type="text" id="vpPhone" placeholder="+X XXX XXX XXXX" required>
+                                </div>
+                                <div class="field">
+                                    <label for="vpReason">Purpose of visit</label>
+                                    <input type="text" id="vpReason" placeholder="e.g. Meeting, Delivery" required>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem;">
+                                    <div class="field">
+                                        <label for="vpType">Pass type</label>
+                                        <select id="vpType">
+                                            <option value="entry">Entry only</option>
+                                            <option value="exit">Exit only</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label for="vpTtl">Expiry (minutes)</label>
+                                        <input type="number" id="vpTtl" value="120" min="15">
+                                    </div>
+                                </div>
+                                <div id="vpError" style="display:none;" class="alert alert-error mb-2"></div>
+                                <button type="submit" class="btn btn-primary btn-full">Generate pass</button>
+                            </form>
+                        </div>
+                        <!-- QR result -->
+                        <div>
+                            <h3 style="font-size:.9rem;font-weight:600;margin-bottom:1rem;color:var(--text-2);">Generated pass</h3>
+                            <div id="vpResult" style="display:none;" class="qr-result-box">
+                                <p style="color:var(--success);font-weight:600;margin-bottom:1rem;font-size:.9rem;">Pass generated successfully</p>
+                                <div class="qr-white-bg">
+                                    <div id="vpQrCode"></div>
+                                </div>
+                                <p style="font-size:.72rem;color:var(--text-3);margin-bottom:.5rem;">Token string</p>
+                                <textarea id="vpResultText" readonly rows="4" style="width:100%;background:var(--bg-base);color:var(--info);font-family:'JetBrains Mono',monospace;font-size:.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);padding:.6rem;resize:vertical;"></textarea>
+                            </div>
+                            <div id="vpResultEmpty" style="padding:3rem;text-align:center;background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-md);">
+                                <p style="color:var(--text-3);font-size:.85rem;">No pass generated yet.<br>Fill the form and click "Generate pass".</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
         </div>
     </div>
 
-    <script src="../common/config.js?v=20260306k"></script>
-    <script src="app.js?v=20260306k"></script>
-</body>
+    <!-- ═══ USER MODAL ═══ -->
+    <div id="userModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="userModalTitle">Add user</h2>
+                <button type="button" onclick="closeUserModal()" class="modal-close">&times;</button>
+            </div>
+            <form id="userForm" onsubmit="handleUserSubmit(event)">
+                <div class="grid-form">
+                    <div class="field">
+                        <label for="umName">Full name</label>
+                        <input type="text" id="umName" required>
+                    </div>
+                    <div class="field">
+                        <label for="umEmail">Email</label>
+                        <input type="email" id="umEmail" required>
+                    </div>
+                    <div class="field" id="umPasswordGroup">
+                        <label for="umPassword">Password</label>
+                        <input type="password" id="umPassword" placeholder="Min. 8 characters">
+                    </div>
+                    <div class="field">
+                        <label for="umRole">Role</label>
+                        <select id="umRole" required onchange="toggleStudentFieldsBaseOnRole()">
+                            <option value="student">Student</option>
+                            <option value="guard">Guard</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="studentExtraFields" class="grid-form" style="margin-top:.875rem;">
+                    <div class="field">
+                        <label for="umStudentId">Student ID</label>
+                        <input type="text" id="umStudentId" placeholder="e.g. S12345">
+                    </div>
+                    <div class="field">
+                        <label for="umClass">Department / class</label>
+                        <input type="text" id="umClass" placeholder="e.g. CS Year 2">
+                    </div>
+                    <div class="field">
+                        <label for="umPhone">Phone number</label>
+                        <input type="tel" id="umPhone" placeholder="+X XXX XXX XXXX">
+                    </div>
+                    <div class="field">
+                        <label for="umGuardian">Guardian phone</label>
+                        <input type="tel" id="umGuardian" placeholder="+X XXX XXX XXXX">
+                    </div>
+                </div>
+                <div class="field" id="umActiveGroup" style="display:none;margin-top:1rem;background:var(--bg-raised);padding:.875rem;border:1px solid var(--border);border-radius:var(--radius-sm);">
+                    <label class="check-label" style="margin:0;">
+                        <input type="checkbox" id="umActive"> Account is active
+                    </label>
+                </div>
+                <div id="umError" style="display:none;" class="alert alert-error mt-2 mb-2"></div>
+                <div style="display:flex;gap:.875rem;margin-top:1.25rem;">
+                    <button type="button" class="btn btn-ghost" style="flex:1;" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex:2;" id="umSubmitBtn">Save user</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.admin-nav .nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            const map = { clearances: 0, passes: 1, users: 2, slots: 3, visitors: 4 };
+            document.querySelectorAll('.admin-nav .nav-btn')[map[tabId]].classList.add('active');
+            const panelMap = {
+                clearances: 'clearances-panel',
+                passes:     'passes-panel',
+                users:      'usersPanel',
+                slots:      'slotPanel',
+                visitors:   'visitors-panel'
+            };
+            document.getElementById(panelMap[tabId]).classList.add('active');
+            if (tabId === 'users' && typeof fetchUsers === 'function') fetchUsers();
+            if (tabId === 'slots' && typeof loadSlots === 'function') loadSlots();
+        }
+        function toggleStudentFieldsBaseOnRole() {
+            const role = document.getElementById('umRole').value;
+            document.getElementById('studentExtraFields').style.display =
+                role === 'student' ? 'grid' : 'none';
+        }
+    </script>
+    <script src="../common/config.js?v=20260306n"></script>
+    <script src="../common/utils.js?v=20260521a"></script>
+    <script src="../common/api.js?v=20260306n"></script>
+    <script src="../common/video-bg.js?v=20260519b"></script>
+    <script src="app.js?v=20260521a"></script>
+</body>
 </html>

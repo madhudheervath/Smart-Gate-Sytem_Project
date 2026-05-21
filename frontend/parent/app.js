@@ -5,7 +5,17 @@
 
 let currentStudent = null;
 let parentAccessToken = null;
+
+// Capture URL params at module-load time — BEFORE history.pushState strips the query string
+const _initParams = new URLSearchParams(window.location.search);
+parentAccessToken = _initParams.get('access_token') || null;
+
 const apiClient = CONFIG.createApiClient();
+
+function escapeHtml(v) {
+    if (v == null) return '';
+    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 async function apiFetch(path, options = {}) {
     return apiClient.fetch(path, options);
@@ -21,22 +31,14 @@ function hasConfiguredWebPush() {
 
 // Navigation between steps
 function showStep(stepId) {
-    console.log('showStep called with:', stepId);
-
     const steps = document.querySelectorAll('.step');
-    console.log('Found steps:', steps.length);
-
     steps.forEach(step => {
         step.classList.remove('active');
-        console.log('Removed active from:', step.id);
     });
 
     const targetStep = document.getElementById(stepId);
     if (targetStep) {
         targetStep.classList.add('active');
-        console.log('Added active to:', stepId);
-    } else {
-        console.error('Step not found:', stepId);
     }
 }
 
@@ -61,16 +63,16 @@ function setupAnother() {
 async function validateStudent() {
     const studentId = document.getElementById('studentId').value.trim();
     const studentName = document.getElementById('studentName').value.trim();
-    const parentName = document.getElementById('parentName').value.trim();
+    const parentName = document.getElementById('parentName').value.trim() || 'Guardian';
     const parentPhone = document.getElementById('parentPhone').value.trim();
 
-    if (!studentId || !studentName || !parentName) {
-        alert('Please fill in all required fields');
+    if (!studentId || !studentName) {
+        showErrorPage('This secure link is missing student details. Generate a fresh guardian link from the student portal.');
         return;
     }
 
     if (!parentAccessToken) {
-        alert('This page requires the secure link generated from the student portal.');
+        showErrorPage('This page requires the secure link generated from the student portal.');
         return;
     }
 
@@ -162,16 +164,9 @@ async function enableNotifications() {
 // Helper functions
 function updateProgress(elementId, text, status) {
     const element = document.getElementById(elementId);
+    if (!element) return;
     element.textContent = text;
-    element.className = `status ${status}`;
-
-    // Update step number
-    const stepNumber = element.closest('.progress-step').querySelector('.step-number');
-    if (status === 'success') {
-        stepNumber.classList.add('completed');
-    } else if (status === 'waiting') {
-        stepNumber.classList.add('active');
-    }
+    element.className = `log-item ${status}`;
 }
 
 async function linkParentToStudent() {
@@ -206,7 +201,10 @@ async function linkParentToStudent() {
 
 function showSuccessPage() {
     // Update the success message
-    document.getElementById('successStudentName').textContent = currentStudent.name;
+    const studentInfo = document.getElementById('studentInfo2');
+    if (studentInfo) {
+        studentInfo.textContent = `${currentStudent.name} (${currentStudent.id})`;
+    }
     const setupNote = document.getElementById('successSetupNote');
     if (setupNote) {
         if (hasBrowserNotifications() && Notification.permission === 'granted') {
@@ -214,8 +212,13 @@ function showSuccessPage() {
                 ? 'Web push is configured for this device.'
                 : 'Browser alerts are enabled on this device only. Server push is not configured in this build.';
         } else {
-            setupNote.textContent = 'Parent contact details are linked. Use this page to review recent entry and exit history.';
+            setupNote.textContent = 'Guardian link active. Use this page to review recent entry and exit history.';
         }
+    }
+    const notifBadge = document.getElementById('notifBadge');
+    if (notifBadge) {
+        const notifOn = hasBrowserNotifications() && Notification.permission === 'granted';
+        notifBadge.textContent = notifOn ? '📡 Push Notifications: ON' : '🔕 Push Notifications: OFF';
     }
 
     showStep('success');
@@ -263,28 +266,30 @@ function displayLastStatus(status) {
     const displayDiv = document.getElementById('lastStatusDisplay');
     displayDiv.style.display = 'block';
 
-    const icon = status.scan_type === 'entry' ? '🟢' : '🔴';
-    const typeText = status.scan_type === 'entry' ? 'ENTERED Campus' : 'EXITED Campus';
-    const bgColor = status.scan_type === 'entry' ? '#28a745' : '#dc3545';
-    const bgLight = status.scan_type === 'entry' ? '#d4edda' : '#f8d7da';
+    const scanType = status.scan_type || 'entry';
+    const icon = scanType === 'entry' ? '🟢' : '🔴';
+    const typeText = scanType === 'entry' ? 'ENTERED Campus' : 'EXITED Campus';
+    const accentColor = scanType === 'entry' ? 'var(--color-green, #34c759)' : 'var(--color-red, #ff3b30)';
+    const bgTint = scanType === 'entry' ? 'rgba(52,199,89,0.08)' : 'rgba(255,59,48,0.08)';
+    const borderColor = scanType === 'entry' ? 'rgba(52,199,89,0.4)' : 'rgba(255,59,48,0.4)';
 
     displayDiv.innerHTML = `
-        <div style="background: ${bgLight}; border: 2px solid ${bgColor}; border-radius: 10px; padding: 20px; text-align: left;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                <div style="font-size: 24px;">${icon}</div>
-                <div style="font-size: 12px; color: #666;">${status.date}</div>
+        <div style="background:${bgTint};border:2px solid ${borderColor};border-radius:10px;padding:1.1rem 1.3rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+                <div style="font-size:1.5rem;">${icon}</div>
+                <div style="font-size:0.75rem;color:var(--color-text-muted,#8b9cb3);font-family:'JetBrains Mono',monospace;">${escapeHtml(status.date)}</div>
             </div>
-            <div style="font-size: 18px; font-weight: bold; color: ${bgColor}; margin-bottom: 5px;">
+            <div style="font-size:1.1rem;font-weight:700;color:${accentColor};margin-bottom:0.4rem;">
                 ${typeText}
             </div>
-            <div style="font-size: 16px; color: #333; margin-bottom: 8px;">
-                <strong>${currentStudent.name}</strong> (${currentStudent.id})
+            <div style="font-size:0.95rem;color:var(--color-text-main,#e8eaf0);margin-bottom:0.5rem;">
+                <strong>${escapeHtml(currentStudent.name)}</strong> (${escapeHtml(currentStudent.id)})
             </div>
-            <div style="font-size: 14px; color: #666;">
-                📍 ${status.location || 'Main Gate'}
+            <div style="font-size:0.82rem;color:var(--color-text-muted,#8b9cb3);">
+                📍 ${escapeHtml(status.location || 'Main Gate')}
             </div>
-            <div style="font-size: 14px; color: #666;">
-                🕒 ${status.time}
+            <div style="font-size:0.82rem;color:var(--color-text-muted,#8b9cb3);">
+                🕒 ${escapeHtml(status.time)}
             </div>
         </div>
     `;
@@ -325,21 +330,24 @@ async function loadStudentHistory() {
 // Display history items
 function displayHistory(history) {
     const historyList = document.getElementById('historyList');
+    historyList.innerHTML = '';
+    historyList.style.display = 'block';
 
     history.forEach(item => {
-        const historyItem = document.createElement('div');
-        historyItem.className = `history-item ${item.scan_type}`;
+        const historyItem = document.createElement('li');
+        const scanType = item.scan_type || 'entry';
+        historyItem.className = `history-item ${scanType}`;
 
-        const icon = item.scan_type === 'entry' ? '🟢' : '🔴';
-        const typeText = item.scan_type === 'entry' ? 'Entered Campus' : 'Exited Campus';
+        const icon = scanType === 'entry' ? '🟢' : '🔴';
+        const typeText = scanType === 'entry' ? 'Entered Campus' : 'Exited Campus';
 
         historyItem.innerHTML = `
             <div class="history-item-header">
-                <span class="history-item-type">${icon} ${typeText}</span>
-                <span class="history-item-time">${item.time}</span>
+                <span class="history-item-type">${icon} ${escapeHtml(typeText)}</span>
+                <span class="history-item-time">${escapeHtml(item.time)}</span>
             </div>
             <div class="history-item-details">
-                ${item.date} • ${item.location}
+                ${escapeHtml(item.date)} • ${escapeHtml(item.location || 'Main Gate')}
             </div>
         `;
 
@@ -386,23 +394,17 @@ async function testNotification() {
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('DOM Content Loaded - Parent portal initializing...');
-
-    // Check if we have URL parameters for auto-fill
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentId = urlParams.get('student_id');
-    const studentName = urlParams.get('student_name');
-    parentAccessToken = urlParams.get('access_token');
-
-    console.log('URL params:', { studentId, studentName, hasAccessToken: !!parentAccessToken });
+    // Use params captured at module load time (history.pushState may have stripped the query string by now)
+    const studentId = _initParams.get('student_id') || '';
+    const studentName = _initParams.get('student_name') || '';
+    const parentName = _initParams.get('parent_name') || 'Guardian';
+    const parentPhone = _initParams.get('parent_phone') || '';
+    // parentAccessToken is already set from _initParams at module level
 
     if (studentId) {
         const studentIdInput = document.getElementById('studentId');
         if (studentIdInput) {
             studentIdInput.value = studentId;
-            console.log('Set student ID:', studentId);
-        } else {
-            console.error('Student ID input not found');
         }
     }
 
@@ -410,25 +412,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const studentNameInput = document.getElementById('studentName');
         if (studentNameInput) {
             studentNameInput.value = studentName;
-            console.log('Set student name:', studentName);
-        } else {
-            console.error('Student name input not found');
         }
     }
+    const parentNameInput = document.getElementById('parentName');
+    if (parentNameInput) parentNameInput.value = parentName;
+    const parentPhoneInput = document.getElementById('parentPhone');
+    if (parentPhoneInput) parentPhoneInput.value = parentPhone;
 
     // Show first step
-    console.log('Showing step1...');
     showStep('step1');
 
     if (!parentAccessToken) {
-        console.warn('Parent portal opened without secure access token');
+        showErrorPage('Parent portal opened without a secure access token. Use the link generated by the student portal.');
+        return;
     }
 
-    console.log('✅ Parent notification portal loaded successfully');
+    validateStudent();
 });
-
-// Add immediate console log to verify script is loading
-console.log('🔄 Parent portal app.js script loaded');
 
 // Service Worker registration is only needed when real web push is configured.
 if (hasConfiguredWebPush() && 'serviceWorker' in navigator) {
@@ -452,5 +452,5 @@ window.addEventListener('popstate', function (event) {
     }
 });
 
-// Push initial state
-history.pushState(null, null, window.location.pathname);
+// Push initial state — preserve full URL so query params remain accessible
+history.pushState(null, null, window.location.href);

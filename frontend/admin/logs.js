@@ -7,6 +7,8 @@ let authToken = localStorage.getItem('adminToken');
 let currentUser = null;
 let dailyChart = null;
 let hourlyChart = null;
+let trendChart = null;
+let donutChart = null;
 let ws = null;
 let allLogs = [];
 let wsPingInterval = null;
@@ -106,6 +108,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         await loadStatistics();
         await loadDailyChart();
         await loadHourlyChart();
+        await loadTrendChart();
+        await loadDonutChart();
+        await loadComplianceAnalytics();
         await loadRecentLogs();
         connectWebSocket();
 
@@ -452,6 +457,8 @@ function handleNewScan(scanData) {
     // Update statistics
     loadStatistics();
     refreshChartsSoon();
+    loadDonutChart();
+    loadComplianceAnalytics();
 
     // Show notification (optional)
     showNotification(scanData);
@@ -471,6 +478,158 @@ function refreshChartsSoon() {
         loadDailyChart();
         loadHourlyChart();
     }, 400);
+}
+
+// ============================================================================
+// ANALYTICS — 30-DAY TREND, DONUT, COMPLIANCE
+// ============================================================================
+
+async function loadTrendChart() {
+    try {
+        const token = localStorage.getItem('adminToken');
+        const days = document.getElementById('trendDays')?.value || 30;
+        const response = await apiFetch(`/api/analytics/trend?days=${days}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to load trend');
+        const data = await response.json();
+
+        const ctx = document.getElementById('trendChart')?.getContext('2d');
+        if (!ctx) return;
+        if (trendChart) trendChart.destroy();
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: 'Entries',
+                        data: data.entries,
+                        borderColor: 'rgba(16,185,129,1)',
+                        backgroundColor: 'rgba(16,185,129,0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                    },
+                    {
+                        label: 'Exits',
+                        data: data.exits,
+                        borderColor: 'rgba(239,68,68,1)',
+                        backgroundColor: 'rgba(239,68,68,0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                    },
+                    {
+                        label: '7-Day Avg',
+                        data: data.sma7,
+                        borderColor: 'rgba(102,126,234,0.8)',
+                        borderDash: [6, 3],
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } }
+            }
+        });
+    } catch (err) {
+        console.error('Trend chart error:', err);
+    }
+}
+
+async function loadDonutChart() {
+    try {
+        const token = localStorage.getItem('adminToken');
+        const response = await apiFetch('/api/analytics/compliance?days=30', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to load compliance');
+        const data = await response.json();
+
+        const ctx = document.getElementById('donutChart')?.getContext('2d');
+        if (!ctx) return;
+        if (donutChart) donutChart.destroy();
+
+        donutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Entries', 'Exits'],
+                datasets: [{
+                    data: [data.entries, data.exits],
+                    backgroundColor: ['rgba(16,185,129,0.8)', 'rgba(239,68,68,0.8)'],
+                    borderColor: ['rgba(16,185,129,1)', 'rgba(239,68,68,1)'],
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed}` } }
+                },
+                cutout: '60%',
+            }
+        });
+
+        const statsEl = document.getElementById('donutStats');
+        if (statsEl) {
+            const ratio = data.entry_exit_ratio ? data.entry_exit_ratio.toFixed(2) : 'N/A';
+            statsEl.innerHTML = `
+                <div>Entries: <strong>${data.entries}</strong></div>
+                <div>Exits: <strong>${data.exits}</strong></div>
+                <div>Ratio: <strong>${ratio}</strong></div>`;
+        }
+    } catch (err) {
+        console.error('Donut chart error:', err);
+    }
+}
+
+async function loadComplianceAnalytics() {
+    try {
+        const token = localStorage.getItem('adminToken');
+        const [compRes, peakRes, slotRes] = await Promise.all([
+            apiFetch('/api/analytics/compliance?days=30', { headers: { 'Authorization': `Bearer ${token}` } }),
+            apiFetch('/api/analytics/peak-hours?days=30', { headers: { 'Authorization': `Bearer ${token}` } }),
+            apiFetch('/api/analytics/slot-utilization', { headers: { 'Authorization': `Bearer ${token}` } }),
+        ]);
+
+        if (compRes.ok) {
+            const comp = await compRes.json();
+            const gpsEl = document.getElementById('gpsCompliance');
+            const ratioEl = document.getElementById('entryExitRatio');
+            if (gpsEl) gpsEl.textContent = `${comp.gps_compliance_rate ?? 0}%`;
+            if (ratioEl) ratioEl.textContent = comp.entry_exit_ratio ? comp.entry_exit_ratio.toFixed(2) : 'N/A';
+        }
+
+        if (peakRes.ok) {
+            const peak = await peakRes.json();
+            const peakEl = document.getElementById('peakHour');
+            const volEl = document.getElementById('peakVolume');
+            if (peakEl) peakEl.textContent = peak.peak_hour || '--';
+            if (volEl) volEl.textContent = `${peak.peak_volume ?? 0} scans`;
+        }
+
+        if (slotRes.ok) {
+            const slot = await slotRes.json();
+            const slots = slot.slots || [];
+            const avgUtil = slots.length
+                ? (slots.reduce((s, x) => s + x.utilization_pct, 0) / slots.length).toFixed(1)
+                : 0;
+            const utilEl = document.getElementById('slotUtil');
+            if (utilEl) utilEl.textContent = `${avgUtil}%`;
+        }
+    } catch (err) {
+        console.error('Compliance analytics error:', err);
+    }
 }
 
 // ============================================================================

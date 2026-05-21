@@ -1,3 +1,4 @@
+const API_BASE = CONFIG.API_BASE;
 let token = localStorage.getItem('adminToken');
 let currentUser = null;
 let currentPassFilter = 'pending';
@@ -18,6 +19,26 @@ function escapeHtml(value) {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
+}
+
+function formatAdminDateTime(value, options = {}) {
+    if (window.DateTimeHelper) return DateTimeHelper.formatLocal(value, options);
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
+}
+
+function formatAdminTime(value, options = {}) {
+    if (window.DateTimeHelper) return DateTimeHelper.formatTime(value, options);
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'N/A' : date.toLocaleTimeString();
+}
+
+function parseAdminDate(value) {
+    if (window.DateTimeHelper) return DateTimeHelper.parseBackendDate(value);
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
 async function apiFetch(path, options = {}) {
@@ -345,7 +366,8 @@ function updateStats() {
             return false;
         }
         // Convert approved time to IST date string
-        const approvedDate = new Date(p.approved_time);
+        const approvedDate = parseAdminDate(p.approved_time);
+        if (!approvedDate) return false;
         const approvedIST = approvedDate.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
         const isToday = approvedIST === today;
         if (isToday) {
@@ -431,8 +453,8 @@ function displayRegistrationRequests() {
 }
 
 function createRegistrationCard(request) {
-    const createdDate = new Date(request.created_at).toLocaleString();
-    const reviewedDate = request.reviewed_at ? new Date(request.reviewed_at).toLocaleString() : '';
+    const createdDate = formatAdminDateTime(request.created_at);
+    const reviewedDate = request.reviewed_at ? formatAdminDateTime(request.reviewed_at) : '';
     const name = escapeHtml(request.name);
     const email = escapeHtml(request.email);
     const studentId = escapeHtml(request.student_id || 'N/A');
@@ -444,55 +466,55 @@ function createRegistrationCard(request) {
     const approvedRole = request.approved_role ? formatRequestedRole(request.approved_role) : '';
     const requestedRole = formatRequestedRole(request.requested_role);
     const cardBorder = request.status === 'approved'
-        ? '#28a745'
+        ? 'var(--success)'
         : request.status === 'rejected'
-            ? '#dc3545'
-            : '#9c27b0';
+            ? 'var(--danger)'
+            : 'var(--accent-h)';
     return `
         <div class="pass-item" style="border-left: 4px solid ${cardBorder};">
             <div class="pass-header">
-                <span class="pass-id">👤 Request #${request.id}</span>
+                <span class="pass-id">Request #${request.id}</span>
                 <span class="status-badge status-${request.status}">${request.status.toUpperCase()}</span>
             </div>
             <div class="pass-details">
-                <div style="background:#f8f9fa; padding:12px; border-radius:6px; margin-bottom:12px;">
-                    <p style="margin:4px 0;"><strong>Name:</strong> ${name}</p>
-                    <p style="margin:4px 0;"><strong>Email:</strong> ${email}</p>
-                    <p style="margin:4px 0;"><strong>Requested Access:</strong> ${requestedRole}</p>
-                    <p style="margin:4px 0;"><strong>Personnel ID:</strong> ${studentId}</p>
-                    <p style="margin:4px 0;"><strong>Department / Class:</strong> ${studentClass}</p>
-                    <p style="margin:4px 0;"><strong>Phone:</strong> ${phone}</p>
+                <div style="background:var(--bg-raised); padding:12px; border-radius:6px; margin-bottom:12px; border:1px solid var(--border);">
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Name:</strong> ${name}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Email:</strong> ${email}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Requested Access:</strong> ${requestedRole}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Personnel ID:</strong> ${studentId}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Dept / Class:</strong> ${studentClass}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Phone:</strong> ${phone}</p>
                 </div>
-                <p><strong>Requested:</strong> ${createdDate}</p>
+                <p style="color:var(--text-2);"><strong style="color:var(--text-3);">Requested:</strong> ${createdDate}</p>
                 ${request.status === 'approved' && approvedRole ? `
-                    <p><strong>Approved As:</strong> ${approvedRole}</p>
+                    <p style="color:var(--text-2);"><strong style="color:var(--text-3);">Approved As:</strong> ${approvedRole}</p>
                 ` : ''}
                 ${request.status !== 'pending' ? `
-                    <p><strong>Reviewed:</strong> ${reviewedDate || 'N/A'}${reviewedBy ? ` by ${reviewedBy}` : ''}</p>
+                    <p style="color:var(--text-2);"><strong style="color:var(--text-3);">Reviewed:</strong> ${reviewedDate || 'N/A'}${reviewedBy ? ` by ${reviewedBy}` : ''}</p>
                 ` : ''}
                 ${request.request_reason ? `
                     <div class="pass-reason">
-                        <strong>Reason:</strong> ${requestReason}
+                        <strong style="color:var(--text-3);">Reason:</strong> ${requestReason}
                     </div>
                 ` : ''}
                 ${reviewNotes ? `
                     <div class="pass-reason">
-                        <strong>Review Notes:</strong> ${reviewNotes}
+                        <strong style="color:var(--text-3);">Review Notes:</strong> ${reviewNotes}
                     </div>
                 ` : ''}
             </div>
             ${request.status === 'pending' ? `
                 <div class="pass-actions" style="align-items:center; gap:10px; flex-wrap:wrap;">
-                    <label for="approvalRole-${request.id}" style="font-weight:600; color:#555;">Create account as</label>
-                    <select id="approvalRole-${request.id}" style="padding:10px 12px; border-radius:8px; border:1px solid #d0d7de;">
+                    <label for="approvalRole-${request.id}" style="font-weight:500;color:var(--text-2);">Create account as</label>
+                    <select id="approvalRole-${request.id}">
                         <option value="personnel" ${request.requested_role === 'guard' ? '' : 'selected'}>Authorized Personnel</option>
                         <option value="guard" ${request.requested_role === 'guard' ? 'selected' : ''}>Security Guard</option>
                     </select>
-                    <button class="btn btn-success" onclick="approveRegistrationRequest(${request.id})">
-                        ✅ Approve Account
+                    <button class="btn btn-success btn-sm" onclick="approveRegistrationRequest(${request.id})">
+                        Approve Account
                     </button>
-                    <button class="btn btn-danger" onclick="rejectRegistrationRequest(${request.id})">
-                        ❌ Reject
+                    <button class="btn btn-danger btn-sm" onclick="rejectRegistrationRequest(${request.id})">
+                        Reject
                     </button>
                 </div>
             ` : ''}
@@ -502,15 +524,14 @@ function createRegistrationCard(request) {
 
 // Create pass card HTML
 function createPassCard(pass) {
-    const requestDate = new Date(pass.request_time).toLocaleString();
-    const approvedDate = pass.approved_time ? new Date(pass.approved_time).toLocaleString() : 'N/A';
-    const expiryDate = pass.expiry_time ? new Date(pass.expiry_time).toLocaleString() : 'N/A';
-    const usedDate = pass.used_time ? new Date(pass.used_time).toLocaleString() : 'N/A';
+    const requestDate = formatAdminDateTime(pass.request_time);
+    const approvedDate = pass.approved_time ? formatAdminDateTime(pass.approved_time) : 'N/A';
+    const expiryDate = pass.expiry_time ? formatAdminDateTime(pass.expiry_time) : 'N/A';
+    const usedDate = pass.used_time ? formatAdminDateTime(pass.used_time) : 'N/A';
 
     // Check if it's a daily entry pass
     const isDailyEntry = pass.reason.includes('Daily Entry');
-    const passTypeIcon = isDailyEntry ? '🚪' : '🚶';
-    const passTypeLabel = isDailyEntry ? '<span style="background:#4facfe;color:white;padding:4px 8px;border-radius:4px;font-size:12px;margin-left:8px;">DAILY ENTRY</span>' : '';
+    const passTypeLabel = isDailyEntry ? '<span class="badge badge-info" style="margin-left:8px;font-size:.68rem;">DAILY ENTRY</span>' : '';
 
     // student info display
     const studentName = escapeHtml(pass.student_name || 'Unknown');
@@ -519,32 +540,32 @@ function createPassCard(pass) {
     const reason = escapeHtml(pass.reason);
 
     return `
-        <div class="pass-item" style="${isDailyEntry ? 'border-left: 4px solid #4facfe;' : ''}">
+        <div class="pass-item" style="${isDailyEntry ? 'border-left: 4px solid var(--info);' : ''}">
             <div class="pass-header">
-                <span class="pass-id">${passTypeIcon} Pass #${pass.id} ${passTypeLabel}</span>
+                <span class="pass-id">Pass #${pass.id} ${passTypeLabel}</span>
                 <span class="status-badge status-${pass.status}">${pass.status.toUpperCase()}</span>
             </div>
             <div class="pass-details">
-                <div style="background:#f8f9fa; padding:12px; border-radius:6px; margin-bottom:12px;">
-                    <p style="margin:4px 0;"><strong>👤 Student:</strong> ${studentName}</p>
-                    <p style="margin:4px 0;"><strong>🎓 ID:</strong> ${studentCode}</p>
-                    <p style="margin:4px 0;"><strong>📚 Class:</strong> ${studentClass}</p>
+                <div style="background:var(--bg-raised); padding:12px; border-radius:6px; margin-bottom:12px; border:1px solid var(--border);">
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Student:</strong> ${studentName}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">ID:</strong> ${studentCode}</p>
+                    <p style="margin:4px 0;color:var(--text-2);"><strong style="color:var(--text-3);">Class:</strong> ${studentClass}</p>
                 </div>
-                <p><strong>Requested:</strong> ${requestDate}</p>
-                ${pass.approved_time ? `<p><strong>Approved:</strong> ${approvedDate}</p>` : ''}
-                ${pass.expiry_time ? `<p><strong>Expires:</strong> ${expiryDate}</p>` : ''}
-                ${pass.used_time ? `<p><strong>Used:</strong> ${usedDate}</p>` : ''}
+                <p style="color:var(--text-2);"><strong style="color:var(--text-3);">Requested:</strong> ${requestDate}</p>
+                ${pass.approved_time ? `<p style="color:var(--text-2);"><strong style="color:var(--text-3);">Approved:</strong> ${approvedDate}</p>` : ''}
+                ${pass.expiry_time ? `<p style="color:var(--text-2);"><strong style="color:var(--text-3);">Expires:</strong> ${expiryDate}</p>` : ''}
+                ${pass.used_time ? `<p style="color:var(--text-2);"><strong style="color:var(--text-3);">Used:</strong> ${usedDate}</p>` : ''}
                 <div class="pass-reason">
-                    <strong>Reason:</strong> ${reason}
+                    <strong style="color:var(--text-3);">Reason:</strong> ${reason}
                 </div>
             </div>
             ${pass.status === 'pending' ? `
                 <div class="pass-actions">
-                    <button class="btn btn-success" onclick="approvePass(${pass.id})">
-                        ✅ Approve ${isDailyEntry ? 'Entry' : ''}
+                    <button class="btn btn-success btn-sm" onclick="approvePass(${pass.id})">
+                        Approve ${isDailyEntry ? 'Entry' : ''}
                     </button>
-                    <button class="btn btn-danger" onclick="rejectPass(${pass.id})">
-                        ❌ Reject
+                    <button class="btn btn-danger btn-sm" onclick="rejectPass(${pass.id})">
+                        Reject
                     </button>
                 </div>
             ` : ''}
@@ -645,7 +666,348 @@ async function rejectRegistrationRequest(requestId) {
     }
 }
 
+// ============================================================================
+// SLOT MANAGEMENT
+// ============================================================================
+
+let slotPanelOpen = false;
+
+function toggleSlotPanel() {
+    const panel = document.getElementById('slotPanel');
+    slotPanelOpen = !slotPanelOpen;
+    panel.style.display = slotPanelOpen ? 'block' : 'none';
+    if (slotPanelOpen) loadSlots();
+}
+
+function showSlotError(message) {
+    const errEl = document.getElementById('slotError');
+    if (!errEl) return;
+    errEl.textContent = message || '';
+    errEl.style.display = message ? 'block' : 'none';
+}
+
+function slotInputValue(date) {
+    return window.DateTimeHelper
+        ? DateTimeHelper.toLocalInputValue(date)
+        : new Date(date).toISOString().slice(0, 16);
+}
+
+function slotInputDate(id) {
+    const value = document.getElementById(id)?.value;
+    if (window.DateTimeHelper) return DateTimeHelper.fromLocalInputValue(value);
+    const date = value ? new Date(value) : null;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function setSlotInputs(start, end) {
+    const startInput = document.getElementById('slotStart');
+    const endInput = document.getElementById('slotEnd');
+    if (startInput) startInput.value = slotInputValue(start);
+    if (endInput) endInput.value = slotInputValue(end);
+    updateSlotWindowPreview();
+}
+
+function defaultSlotStart() {
+    const base = new Date(Date.now() + 15 * 60 * 1000);
+    return window.DateTimeHelper ? DateTimeHelper.roundUpMinutes(base, 15) : base;
+}
+
+function setSlotPreset(kind) {
+    const now = new Date();
+    let start;
+    let end;
+
+    if (kind === 'morning') {
+        start = new Date(now);
+        start.setDate(start.getDate() + 1);
+        start.setHours(9, 0, 0, 0);
+        end = new Date(start);
+        end.setHours(11, 0, 0, 0);
+    } else if (kind === 'evening') {
+        start = new Date(now);
+        start.setHours(16, 0, 0, 0);
+        if (start <= now) start.setDate(start.getDate() + 1);
+        end = new Date(start);
+        end.setHours(18, 0, 0, 0);
+    } else {
+        start = defaultSlotStart();
+        end = new Date(start.getTime() + 60 * 60 * 1000);
+    }
+
+    setSlotInputs(start, end);
+}
+
+function extendSlotDuration(minutes) {
+    const start = slotInputDate('slotStart') || defaultSlotStart();
+    const currentEnd = slotInputDate('slotEnd') || start;
+    const end = new Date(currentEnd.getTime() + minutes * 60 * 1000);
+    setSlotInputs(start, end);
+}
+
+function updateSlotWindowPreview() {
+    const preview = document.getElementById('slotWindowPreview');
+    const startHint = document.getElementById('slotStartHint');
+    const endHint = document.getElementById('slotEndHint');
+    const endInput = document.getElementById('slotEnd');
+    if (!preview) return;
+
+    const start = slotInputDate('slotStart');
+    const end = slotInputDate('slotEnd');
+
+    if (endInput && start) {
+        endInput.min = slotInputValue(start);
+    }
+
+    if (startHint) startHint.textContent = start ? `Local: ${formatAdminDateTime(start)}` : '';
+    if (endHint) endHint.textContent = end ? `Local: ${formatAdminDateTime(end)}` : '';
+
+    preview.classList.remove('error');
+    if (!start || !end) {
+        preview.textContent = 'Select a start and end time to preview the slot window.';
+        return;
+    }
+    if (end <= start) {
+        preview.classList.add('error');
+        preview.textContent = 'End time must be after start time.';
+        return;
+    }
+
+    const durationMinutes = Math.round((end - start) / 60000);
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = durationMinutes % 60;
+    const duration = [
+        hours ? `${hours} hr${hours === 1 ? '' : 's'}` : '',
+        minutes ? `${minutes} min` : ''
+    ].filter(Boolean).join(' ') || '0 min';
+    const windowLabel = window.DateTimeHelper
+        ? DateTimeHelper.formatSlotWindow(start, end)
+        : `${start.toLocaleString()} to ${end.toLocaleString()}`;
+
+    preview.innerHTML = `
+        <strong>${escapeHtml(windowLabel)}</strong>
+        Duration: ${escapeHtml(duration)}. QR tokens for this slot cannot be valid after the end time.
+    `;
+}
+
+function initSlotTimeControls() {
+    const timezoneLabel = document.getElementById('slotTimezoneLabel');
+    if (timezoneLabel) {
+        timezoneLabel.textContent = window.DateTimeHelper ? DateTimeHelper.zoneLabel() : 'Browser local time';
+    }
+
+    const startInput = document.getElementById('slotStart');
+    const endInput = document.getElementById('slotEnd');
+    if (!startInput || !endInput) return;
+
+    if (!startInput.value || !endInput.value) {
+        const start = defaultSlotStart();
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        setSlotInputs(start, end);
+    }
+
+    startInput.addEventListener('input', updateSlotWindowPreview);
+    startInput.addEventListener('change', updateSlotWindowPreview);
+    endInput.addEventListener('input', updateSlotWindowPreview);
+    endInput.addEventListener('change', updateSlotWindowPreview);
+    updateSlotWindowPreview();
+}
+
+async function loadSlots() {
+    const container = document.getElementById('slotsListContainer');
+    try {
+        const res = await apiFetch('/api/slots?active_only=false', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load slots');
+        const slots = await res.json();
+
+        if (!slots.length) {
+            container.innerHTML = '<p style="color:var(--text-3); text-align:center;padding:20px;">No slots defined yet.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="overflow-x:auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Label</th>
+                        <th>Gate</th>
+                        <th>Window <span style="display:block;font-size:.68rem;font-weight:500;color:var(--text-3);">${escapeHtml(window.DateTimeHelper ? DateTimeHelper.zoneLabel() : 'Local time')}</span></th>
+                        <th style="text-align:center;">Cap.</th>
+                        <th style="text-align:center;">Booked</th>
+                        <th style="text-align:center;">GPS</th>
+                        <th style="text-align:center;">Face</th>
+                        <th style="text-align:center;">Status</th>
+                        <th style="text-align:center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${slots.map(s => `
+                        <tr>
+                            <td style="color:var(--text-1);">${escapeHtml(s.label)}</td>
+                            <td>${escapeHtml(s.gate)}</td>
+                            <td style="font-size:.78rem;line-height:1.45;">
+                                <strong style="color:var(--text-1);font-weight:600;">${escapeHtml(window.DateTimeHelper ? DateTimeHelper.formatSlotWindow(s.start_time, s.end_time) : `${formatAdminDateTime(s.start_time)} to ${formatAdminDateTime(s.end_time)}`)}</strong>
+                            </td>
+                            <td style="text-align:center;">${s.capacity}</td>
+                            <td style="text-align:center;">
+                                ${s.booked_count}
+                                <div style="font-size:.7rem; color:var(--text-3);">${s.remaining} left</div>
+                            </td>
+                            <td style="text-align:center;">${s.gps_required ? '<span style="color:var(--success);">Yes</span>' : '—'}</td>
+                            <td style="text-align:center;">${s.face_check_required ? '<span style="color:var(--success);">Yes</span>' : '—'}</td>
+                            <td style="text-align:center;">
+                                <span class="badge ${s.active ? 'badge-success' : 'badge-danger'}">
+                                    ${s.active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td style="text-align:center;">
+                                <button onclick="deactivateSlot(${s.id})" class="btn btn-danger btn-sm" ${!s.active ? 'disabled' : ''}>
+                                    Deactivate
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            </div>`;
+    } catch (err) {
+        container.innerHTML = `<p style="color:var(--danger);">Failed to load slots: ${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function createSlot(e) {
+    if (e) e.preventDefault();
+    showSlotError('');
+
+    const label = document.getElementById('slotLabel').value.trim();
+    const gate = document.getElementById('slotGate').value.trim() || 'Main Gate';
+    const start = slotInputDate('slotStart');
+    const end = slotInputDate('slotEnd');
+    const capacity = parseInt(document.getElementById('slotCapacity').value) || 50;
+    const gpsReq = document.getElementById('slotGpsReq').checked;
+    const faceReq = document.getElementById('slotFaceReq').checked;
+
+    if (!label) { showSlotError('Label is required.'); return; }
+    if (!start || !end) { showSlotError('Start and end times are required.'); return; }
+    if (end <= start) { showSlotError('End time must be after start time.'); return; }
+
+    try {
+        const res = await apiFetch('/api/slots', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                label, gate, capacity,
+                start_time: start.toISOString(),
+                end_time: end.toISOString(),
+                active: true,
+                gps_required: gpsReq,
+                face_check_required: faceReq,
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to create slot');
+        // Clear form
+        document.getElementById('slotLabel').value = '';
+        document.getElementById('slotCapacity').value = '50';
+        document.getElementById('slotGpsReq').checked = false;
+        document.getElementById('slotFaceReq').checked = false;
+        setSlotPreset('next-hour');
+        await loadSlots();
+    } catch (err) {
+        showSlotError(err.message);
+    }
+}
+
+async function deactivateSlot(slotId) {
+    if (!confirm('Deactivate this slot? All future bookings will be blocked.')) return;
+    try {
+        const res = await apiFetch(`/api/slots/${slotId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to deactivate');
+        await loadSlots();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// ============================================================================
+// VISITOR PASS
+// ============================================================================
+
+function showVisitorPassModal() {
+    document.getElementById('visitorPassModal').style.display = 'flex';
+    document.getElementById('vpResult').style.display = 'none';
+    document.getElementById('vpError').textContent = '';
+    const qrEl = document.getElementById('vpQrCode');
+    if (qrEl) qrEl.innerHTML = '';
+}
+
+function closeVisitorPassModal() {
+    document.getElementById('visitorPassModal').style.display = 'none';
+    document.getElementById('vpName').value = '';
+    document.getElementById('vpPhone').value = '';
+    document.getElementById('vpReason').value = '';
+    document.getElementById('vpTtl').value = '60';
+}
+
+async function issueVisitorPass() {
+    const errEl = document.getElementById('vpError');
+    errEl.textContent = '';
+
+    const name = document.getElementById('vpName').value.trim();
+    const phone = document.getElementById('vpPhone').value.trim();
+    const reason = document.getElementById('vpReason').value.trim();
+    const passType = document.getElementById('vpType').value;
+    const ttl = parseInt(document.getElementById('vpTtl').value) || 60;
+
+    if (!name) { errEl.textContent = 'Visitor name is required.'; return; }
+    if (!reason) { errEl.textContent = 'Reason is required.'; return; }
+
+    try {
+        const res = await apiFetch('/api/admin/visitor-pass', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visitor_name: name, visitor_phone: phone || null, reason, pass_type: passType, ttl_minutes: ttl })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to issue pass');
+
+        const expiry = data.expiry_time ? formatAdminTime(data.expiry_time) : 'N/A';
+        document.getElementById('vpResultText').textContent =
+            `Pass #${data.id} issued. Valid until ${expiry}. Present this QR at the guard checkpoint.`;
+        const qrEl = document.getElementById('vpQrCode');
+        if (qrEl) {
+            qrEl.innerHTML = '';
+            if (data.qr_token && typeof QRCode !== 'undefined') {
+                new QRCode(qrEl, {
+                    text: data.qr_token,
+                    width: 180,
+                    height: 180,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H,
+                });
+            } else {
+                qrEl.textContent = data.qr_token || 'QR token unavailable';
+            }
+        }
+        document.getElementById('vpResult').style.display = 'block';
+    } catch (err) {
+        errEl.textContent = err.message;
+    }
+}
+
+// ============================================================================
 // Check if already logged in
+// ============================================================================
+
+// Check if already logged in
+initSlotTimeControls();
+
 if (token) {
     loadUserInfo().then((loaded) => {
         if (!loaded) return;
@@ -666,3 +1028,255 @@ setInterval(() => {
         loadRegistrationRequests({ status: currentRegistrationFilter, notify: true });
     }
 }, 15000);
+
+// =====================================================================
+// User Management
+// =====================================================================
+
+let _editingUserId = null;
+
+function toggleUsersPanel() {
+    const panel = document.getElementById('usersPanel');
+    const visible = panel.style.display !== 'none';
+    panel.style.display = visible ? 'none' : 'block';
+    if (!visible) loadUsers();
+}
+
+async function loadUsers() {
+    const search = document.getElementById('userSearchInput').value.trim();
+    const role = document.getElementById('userRoleFilter').value;
+    const active = document.getElementById('userActiveFilter').value;
+
+    let url = `${API_BASE}/api/admin/users?`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    if (role) url += `role=${encodeURIComponent(role)}&`;
+    if (active !== '') url += `active=${active}&`;
+
+    const container = document.getElementById('usersTableContainer');
+    container.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:20px;">Loading…</p>';
+
+    try {
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error(await res.text());
+        const users = await res.json();
+
+        if (!users.length) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:20px;">No users found.</p>';
+            return;
+        }
+
+        const roleColors = {
+            admin:   'background:rgba(99,102,241,.15);color:#818cf8;',
+            guard:   'background:rgba(52,211,153,.12);color:#34d399;',
+            student: 'background:rgba(96,165,250,.12);color:#60a5fa;'
+        };
+        const rows = users.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td style="font-weight:600;color:var(--text-1);">${escHtml(u.name)}</td>
+                <td style="font-size:.8rem;">${escHtml(u.email)}</td>
+                <td>
+                    <span style="${roleColors[u.role] || 'background:var(--bg-raised);color:var(--text-2);'}padding:2px 8px;border-radius:12px;font-size:.72rem;">${u.role}</span>
+                </td>
+                <td style="font-size:.8rem;">${escHtml(u.student_id || '—')}</td>
+                <td>
+                    <span style="color:${u.active ? 'var(--success)' : 'var(--danger)'};font-size:.8rem;">${u.active ? 'Active' : 'Inactive'}</span>
+                </td>
+                <td style="font-size:.8rem;">${u.face_registered ? '<span style="color:var(--success);">Enrolled</span>' : '<span style="color:var(--text-3);">None</span>'}</td>
+                <td style="white-space:nowrap;">
+                    <button onclick="openEditUser(${u.id})" class="btn btn-secondary btn-sm" style="margin-right:4px;">Edit</button>
+                    ${u.active
+                        ? `<button onclick="deactivateUser(${u.id},'${escHtml(u.name)}')" class="btn btn-danger btn-sm">Deactivate</button>`
+                        : `<button onclick="reactivateUser(${u.id})" class="btn btn-success btn-sm">Reactivate</button>`
+                    }
+                    ${u.face_registered
+                        ? `<button onclick="resetFace(${u.id},'${escHtml(u.name)}')" class="btn btn-ghost btn-sm" style="margin-top:4px;">Reset Face</button>`
+                        : ''
+                    }
+                </td>
+            </tr>`).join('');
+
+        container.innerHTML = `
+            <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Student ID</th>
+                            <th>Status</th>
+                            <th>Face</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <p style="font-size:.72rem;color:var(--text-3);margin-top:8px;text-align:right;">${users.length} user(s)</p>
+            </div>`;
+    } catch (err) {
+        container.innerHTML = `<p style="color:var(--danger);text-align:center;padding:16px;">Error: ${err.message}</p>`;
+    }
+}
+
+function escHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showCreateUserModal() {
+    _editingUserId = null;
+    document.getElementById('userModalTitle').textContent = 'Create User';
+    document.getElementById('umSubmitBtn').textContent = 'Create';
+    document.getElementById('umPasswordGroup').style.display = 'block';
+    document.getElementById('umActiveGroup').style.display = 'none';
+    ['umName','umEmail','umPassword','umStudentId','umClass','umPhone','umGuardian'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('umRole').value = 'student';
+    document.getElementById('umError').textContent = '';
+    document.getElementById('userModal').style.display = 'flex';
+}
+
+async function openEditUser(userId) {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const u = await res.json();
+
+        _editingUserId = userId;
+        document.getElementById('userModalTitle').textContent = `Edit User — ${u.name}`;
+        document.getElementById('umSubmitBtn').textContent = 'Save Changes';
+        document.getElementById('umPasswordGroup').style.display = 'none';
+        document.getElementById('umActiveGroup').style.display = 'flex';
+
+        document.getElementById('umName').value = u.name || '';
+        document.getElementById('umEmail').value = u.email || '';
+        document.getElementById('umRole').value = u.role || 'student';
+        document.getElementById('umStudentId').value = u.student_id || '';
+        document.getElementById('umClass').value = u.student_class || '';
+        document.getElementById('umPhone').value = u.phone || '';
+        document.getElementById('umGuardian').value = u.guardian_name || '';
+        document.getElementById('umActive').checked = u.active;
+        document.getElementById('umError').textContent = '';
+        document.getElementById('userModal').style.display = 'flex';
+    } catch (err) {
+        alert('Failed to load user: ' + err.message);
+    }
+}
+
+function closeUserModal() {
+    document.getElementById('userModal').style.display = 'none';
+}
+
+async function submitUserModal() {
+    const errEl = document.getElementById('umError');
+    errEl.textContent = '';
+
+    const name = document.getElementById('umName').value.trim();
+    const email = document.getElementById('umEmail').value.trim();
+    const role = document.getElementById('umRole').value;
+
+    if (!name || !email) { errEl.textContent = 'Name and Email are required.'; return; }
+
+    const btn = document.getElementById('umSubmitBtn');
+    btn.disabled = true;
+
+    try {
+        if (_editingUserId == null) {
+            // Create
+            const password = document.getElementById('umPassword').value;
+            if (!password || password.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; btn.disabled=false; return; }
+            const body = {
+                name, email, password, role,
+                student_id: document.getElementById('umStudentId').value.trim() || null,
+                student_class: document.getElementById('umClass').value.trim() || null,
+                phone: document.getElementById('umPhone').value.trim() || null,
+                guardian_name: document.getElementById('umGuardian').value.trim() || null,
+                active: true,
+            };
+            const res = await fetch(`${API_BASE}/api/admin/users`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+            closeUserModal();
+            loadUsers();
+        } else {
+            // Update
+            const body = {
+                name, role,
+                student_id: document.getElementById('umStudentId').value.trim() || null,
+                student_class: document.getElementById('umClass').value.trim() || null,
+                phone: document.getElementById('umPhone').value.trim() || null,
+                guardian_name: document.getElementById('umGuardian').value.trim() || null,
+                active: document.getElementById('umActive').checked,
+            };
+            const res = await fetch(`${API_BASE}/api/admin/users/${_editingUserId}`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+            closeUserModal();
+            loadUsers();
+        }
+    } catch (err) {
+        errEl.textContent = err.message;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function deactivateUser(userId, name) {
+    if (!confirm(`Deactivate account for "${name}"? They will not be able to log in.`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok && res.status !== 204) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+        loadUsers();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function reactivateUser(userId) {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: true }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+        loadUsers();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function resetFace(userId, name) {
+    if (!confirm(`Reset face registration for "${name}"? They will need to re-enroll.`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/users/${userId}/reset-face`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Failed'); }
+        loadUsers();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// ── HTML call-site aliases (HTML uses these names) ──────────────────────
+function openUserModal()               { showCreateUserModal(); }
+function handleUserSubmit(e)           { if(e) e.preventDefault(); submitUserModal(); }
+function generateVisitorPass(e)        { if(e) e.preventDefault(); issueVisitorPass(); }
+function fetchUsers()                  { loadUsers(); }
+function loadAdminData()               { loadPasses(); loadRegistrationRequests({ notify: false }); }

@@ -1,353 +1,770 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Authorized Personnel Portal - GatePass</title>
-
-    <!-- Common Utilities -->
-    <link rel="stylesheet" href="../common/styles.css">
-    <link rel="stylesheet" href="style.css?v=improved-utilities-v6">
-
+    <title>SecureGate — Personnel Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../common/styles.css?v=20260521a">
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="../common/config.js?v=20260306n"></script>
-    <script src="../common/utils.js?v=20260306n"></script>
+    <script src="../common/utils.js?v=20260521a"></script>
     <script src="../common/api.js?v=20260306n"></script>
-</head>
+    <style>
+        .page { display: none; }
+        .page.active { display: block; }
 
-<body>
-    <!-- Login Page -->
+        /* Dashboard shell */
+        .dash-wrap {
+            width: min(calc(100% - var(--page-gutter) * 2), var(--page-max));
+            margin: 0 auto;
+            padding: clamp(1rem, 2vw, 1.5rem) 0 3rem;
+        }
+
+        .user-bar {
+            width: min(calc(100% - var(--page-gutter) * 2), var(--page-max));
+            margin: 1rem auto 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+        .user-bar-name {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-1);
+            margin-bottom: 0.45rem;
+        }
+        .user-bar-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            font-size: 0.78rem;
+            color: var(--text-2);
+        }
+        .user-bar-meta p,
+        .user-bar-meta span { margin: 0; color: inherit; }
+        .user-bar-meta strong { color: var(--text-3); font-weight: 600; }
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            min-height: 1.75rem;
+            padding: 0.2rem 0.65rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--bg-raised);
+            white-space: nowrap;
+        }
+
+        /* ── System alert ── */
+        .system-alert {
+            background: var(--danger-bg);
+            border: 1px solid rgba(248,113,113,.25);
+            border-left: 3px solid var(--danger);
+            border-radius: var(--radius-sm);
+            padding: 0.875rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .system-alert strong { color: var(--danger); font-size: 0.85rem; }
+        .system-alert p { font-size: 0.85rem; color: var(--text-2); margin-top: 0.15rem; }
+
+        .screen-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .screen-heading h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.15rem;
+        }
+        .screen-heading p {
+            max-width: 45rem;
+            font-size: 0.86rem;
+            color: var(--text-2);
+        }
+
+        /* Main workflow layout */
+        .dash-grid {
+            display: grid;
+            grid-template-columns: minmax(320px, 0.72fr) minmax(520px, 1.28fr);
+            gap: clamp(1rem, 1.6vw, 1.5rem);
+            align-items: start;
+        }
+        .col-pass,
+        .col-slots,
+        .col-right { min-width: 0; }
+        .col-right {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+        @media (max-width: 1100px) {
+            .dash-grid { grid-template-columns: 1fr; }
+            .col-right { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 760px) {
+            .dash-wrap,
+            .user-bar { width: min(calc(100% - 1rem), var(--page-max)); }
+            .user-bar,
+            .screen-heading { align-items: stretch; flex-direction: column; }
+            .col-right { grid-template-columns: 1fr; }
+        }
+
+        @media (min-width: 1500px) {
+            .dash-grid {
+                grid-template-columns: minmax(340px, 0.68fr) minmax(680px, 1.32fr);
+            }
+        }
+
+        .workflow-panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.1rem;
+        }
+
+        .workflow-panel .section:last-child { margin-bottom: 0; }
+
+        .subtle-note {
+            color: var(--text-3);
+            font-size: 0.78rem;
+            margin-top: 0.65rem;
+        }
+
+        /* Pass status area */
+        .pass-state {
+            background: var(--bg-raised);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            text-align: center;
+            margin-bottom: 1.1rem;
+        }
+        .pass-state-icon { font-size: 1.45rem; margin-bottom: 0.35rem; opacity: .55; }
+        .pass-state h4 { font-size: 0.95rem; font-weight: 650; color: var(--text-1); margin-bottom: 0.15rem; }
+        .pass-state p  { font-size: 0.78rem; color: var(--text-3); }
+
+        /* Active pass */
+        .active-pass {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--info);
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+        .active-pass-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .active-pass-header h4 { font-size: 0.88rem; font-weight: 600; }
+        .qr-display {
+            background: #fff;
+            border-radius: var(--radius-sm);
+            padding: 0.875rem;
+            display: flex;
+            justify-content: center;
+            width: fit-content;
+            max-width: 100%;
+            margin: 0.75rem auto 0;
+            overflow: hidden;
+        }
+        #qrCode,
+        #qrCode canvas,
+        #qrCode img {
+            max-width: 100%;
+            height: auto !important;
+        }
+
+        /* Pending pass */
+        .pending-pass {
+            background: var(--warning-bg);
+            border: 1px solid rgba(251,191,36,.2);
+            border-left: 3px solid var(--warning);
+            border-radius: var(--radius-md);
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .pending-pass h4 { font-size: 0.88rem; font-weight: 600; color: var(--warning); margin-bottom: 0.5rem; }
+
+        /* Request pass */
+        .pass-btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .hostel-row {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        .hostel-label {
+            font-size: 0.75rem;
+            color: var(--text-3);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Slot booking */
+        .slots-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 0.875rem;
+        }
+        @media (max-width: 760px) { .slots-grid { grid-template-columns: 1fr; } }
+
+        .slot-col-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-3);
+            margin-bottom: 0.625rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .slot-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .slot-empty,
+        .slot-error {
+            border: 1px dashed var(--border-em);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--text-3);
+            background: var(--bg-base);
+        }
+        .slot-error { color: var(--danger); border-color: rgba(248,113,113,.35); }
+        .slot-card,
+        .booking-card {
+            display: grid;
+            gap: 0.9rem;
+            padding: 1rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+        .slot-card {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+        }
+        .slot-card-title {
+            font-size: 0.94rem;
+            font-weight: 700;
+            color: var(--text-1);
+            margin-bottom: 0.35rem;
+        }
+        .slot-meta {
+            display: grid;
+            gap: 0.25rem;
+            font-size: 0.78rem;
+            color: var(--text-2);
+        }
+        .slot-meta span {
+            display: block;
+            overflow-wrap: anywhere;
+        }
+        .slot-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+        }
+        .slot-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.5rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 650;
+            color: var(--success);
+            background: var(--success-bg);
+        }
+        .slot-badge.gps {
+            color: var(--warning);
+            background: var(--warning-bg);
+        }
+        .slot-card-side {
+            min-width: 7rem;
+            text-align: right;
+        }
+        .slot-capacity {
+            font-size: 0.9rem;
+            font-weight: 750;
+            color: var(--success);
+        }
+        .slot-capacity.full { color: var(--danger); }
+        .slot-booked {
+            font-size: 0.74rem;
+            color: var(--text-3);
+            margin-top: 0.1rem;
+        }
+        .slot-card-side .btn { margin-top: 0.65rem; }
+        .booking-card {
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+        }
+        .booking-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-1);
+            margin-bottom: 0.25rem;
+        }
+        .booking-meta {
+            font-size: 0.74rem;
+            color: var(--text-3);
+        }
+        .booking-status {
+            display: inline-flex;
+            margin-top: 0.45rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 999px;
+            color: var(--success);
+            background: var(--success-bg);
+            font-size: 0.72rem;
+            font-weight: 650;
+        }
+        @media (max-width: 620px) {
+            .slot-card,
+            .booking-card { grid-template-columns: 1fr; }
+            .slot-card-side { text-align: left; min-width: 0; }
+        }
+
+        /* Biometrics */
+        .face-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+        }
+        .enrolled-face-card {
+            display: grid;
+            grid-template-columns: 8rem minmax(0, 1fr);
+            gap: 1rem;
+            align-items: center;
+            padding: 0.9rem;
+            margin-bottom: 0.9rem;
+            background: var(--bg-raised);
+            border: 1px solid var(--role-border);
+            border-radius: var(--radius-md);
+        }
+        .enrolled-face-thumb {
+            width: 100%;
+            aspect-ratio: 1;
+            background: rgba(5, 12, 24, 0.72);
+            border: 1px solid var(--border-em);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-3);
+            text-align: center;
+            font-size: 0.78rem;
+            line-height: 1.4;
+        }
+        .enrolled-face-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .enrolled-face-meta h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        .enrolled-face-meta p {
+            font-size: 0.78rem;
+            color: var(--text-2);
+            margin: 0;
+        }
+        .enrolled-face-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        @media (max-width: 620px) {
+            .enrolled-face-card { grid-template-columns: 1fr; }
+            .enrolled-face-thumb { max-width: 12rem; }
+        }
+        #previewImg {
+            max-width: 100%;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            margin-top: 0.5rem;
+        }
+
+        /* Guardian share */
+        .share-box {
+            background: var(--bg-raised);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.875rem;
+            margin-top: 0.75rem;
+        }
+        .share-box label { font-size: 0.72rem; color: var(--text-3); margin-bottom: 0.375rem; display: block; }
+
+        /* History table */
+        .history-wrap { overflow-x: auto; }
+    </style>
+</head>
+<body class="theme-student">
+    <canvas id="particleCanvas" class="live-bg-canvas" aria-hidden="true"></canvas>
+
+    <!-- ═══ NAV ═══ -->
+    <nav class="topnav">
+        <a href="../index.html" class="topnav-brand">SecureGate</a>
+        <span class="topnav-subtitle">Personnel Portal</span>
+        <div class="topnav-end">
+            <a href="../index.html" class="nav-text-link btn btn-ghost btn-sm">← Hub</a>
+        </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════
+         LOGIN PAGE
+    ════════════════════════════════════════════════ -->
     <div id="loginPage" class="page active">
-        <div class="container">
-            <div class="card">
-                <h1>🎓 Authorized Personnel Portal</h1>
-                <h2 id="authFormTitle">Login</h2>
+        <div class="auth-wrap">
+            <div class="auth-box">
+                <div style="margin-bottom:1.75rem;">
+                    <h1 id="authFormTitle" class="auth-title">Sign in</h1>
+                    <p class="auth-subtitle">Use your campus credentials to continue</p>
+                </div>
+
+                <!-- Login form -->
                 <form id="loginForm">
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" placeholder="Enter your email" required>
+                    <div class="field">
+                        <label for="email">Email address</label>
+                        <input type="email" id="email" placeholder="you@campus.edu" required>
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="password">Password</label>
-                        <input type="password" id="password" placeholder="Enter your password" required>
+                        <input type="password" id="password" placeholder="••••••••" required>
                     </div>
-                    <div id="loginInfo"
-                        style="display:none; margin-bottom:16px; padding:12px 14px; border-radius:10px; background:#eef6ff; color:#1f4f8f; border:1px solid #bfd9ff;">
-                    </div>
-                    <div id="loginError" class="error"></div>
-                    <button type="submit" class="btn btn-primary">Login</button>
-                    <p id="registerPrompt" style="text-align: center; margin-top: 15px;">
-                        Need access? <a href="#" onclick="toggleAuthForm('register')">Request approval here</a>
+                    <div id="loginInfo"  style="display:none;" class="alert alert-success mb-2"></div>
+                    <div id="loginError" style="display:none;" class="alert alert-error mb-2"></div>
+                    <button type="submit" class="btn btn-primary btn-full" style="margin-top:.5rem;">Sign in</button>
+                    <p class="auth-switch" id="registerPrompt">
+                        No account? <a href="#" onclick="toggleRegister()">Request access</a>
                     </p>
                 </form>
 
-                <form id="registerForm" style="display: none;">
-                    <div class="form-group">
-                        <label for="regName">Full Name</label>
-                        <input type="text" id="regName" required>
+                <!-- Register form -->
+                <form id="registerForm" style="display:none;">
+                    <div class="field">
+                        <label for="regName">Full name</label>
+                        <input type="text" id="regName" placeholder="e.g. John Doe" required>
                     </div>
-                    <div class="form-group">
-                        <label for="regEmail">Email</label>
-                        <input type="email" id="regEmail" required>
+                    <div class="field">
+                        <label for="regEmail">Email address</label>
+                        <input type="email" id="regEmail" placeholder="you@campus.edu" required>
                     </div>
-                    <div class="form-group">
+                    <div class="field">
                         <label for="regPassword">Password</label>
-                        <input type="password" id="regPassword" required>
+                        <input type="password" id="regPassword" placeholder="Minimum 8 characters" required>
                     </div>
-                    <div class="form-group">
-                        <label for="regAccessType">Access Type</label>
+                    <div class="field">
+                        <label for="regAccessType">Personnel type</label>
                         <select id="regAccessType" required>
-                            <option value="personnel">Authorized Personnel Access</option>
-                            <option value="guard">Security Guard Access</option>
+                            <option value="student">Student</option>
+                            <option value="personnel">Faculty / staff</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="regStudentId">Personnel ID / Employee ID / Roll Number</label>
-                        <input type="text" id="regStudentId">
+                    <div class="field" id="regStudentIdGroup">
+                        <label for="regStudentId">Student ID (optional)</label>
+                        <input type="text" id="regStudentId" placeholder="e.g. S12345">
                     </div>
-                    <div class="form-group">
-                        <label for="regClass">Department / Class / Team</label>
-                        <input type="text" id="regClass">
+                    <div class="field" id="regClassGroup">
+                        <label for="regClass">Department / class (optional)</label>
+                        <input type="text" id="regClass" placeholder="e.g. CS Year 2">
                     </div>
-                    <div class="form-group">
-                        <label for="regPhone">Phone (Optional)</label>
-                        <input type="tel" id="regPhone">
+                    <div class="field">
+                        <label for="regPhone">Phone number (optional)</label>
+                        <input type="tel" id="regPhone" placeholder="+X XXX XXX XXXX">
                     </div>
-                    <div class="form-group">
-                        <label for="regReason">Reason for Access (Optional)</label>
-                        <textarea id="regReason" rows="3"
-                            placeholder="Mention your role, department, or why you need portal access"></textarea>
+                    <div class="field" id="regReasonGroup" style="display:none;">
+                        <label for="regReason" style="color:var(--warning);">Reason for external access</label>
+                        <input type="text" id="regReason" placeholder="State reason for non-campus email">
                     </div>
-                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #555; line-height: 1.6;">
-                        Your request will be reviewed by an administrator. After approval, your account will be created
-                        and you can log in with the email and password entered here.
-                    </p>
-                    <div id="registerError" class="error"></div>
-                    <button type="submit" class="btn btn-primary">Submit Access Request</button>
-                    <p style="text-align: center; margin-top: 15px;">
-                        Already approved? <a href="#" onclick="toggleAuthForm('login')">Login here</a>
+                    <div id="registerError" style="display:none;" class="alert alert-error mb-2"></div>
+                    <button type="submit" class="btn btn-primary btn-full">Submit request</button>
+                    <p class="auth-switch">
+                        Already have access? <a href="#" onclick="toggleLogin()">Sign in</a>
                     </p>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Dashboard Page -->
+    <!-- ═══════════════════════════════════════════════
+         DASHBOARD PAGE
+    ════════════════════════════════════════════════ -->
     <div id="dashboardPage" class="page">
-        <div class="navbar">
-            <div class="nav-content">
-                <h1>🎓 Authorized Personnel Dashboard</h1>
-                <div class="nav-right">
-                    <span id="userName" class="user-name"></span>
-                    <button onclick="logout()" class="btn btn-secondary">Logout</button>
-                </div>
+
+        <!-- User identity bar -->
+        <div class="user-bar">
+            <div>
+                <div class="user-bar-name" id="userName">—</div>
+                <div class="user-bar-meta"><span id="studentInfo"></span></div>
             </div>
+            <button class="btn btn-ghost btn-sm" onclick="logout()">Sign out</button>
         </div>
 
-        <div class="container">
-            <!-- Student Info Card - Full Width -->
-            <div class="card full-width-card" id="studentInfo"
-                style="display:none; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 5px solid #667eea; box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);">
-                <h3 style="margin-bottom:15px; color: #667eea; font-size: 22px; font-weight: 800;">👤 Authorized
-                    Personnel
-                    Information</h3>
-                <!-- Content will be filled by JavaScript -->
+        <!-- System alert banner -->
+        <div id="urgentNotification" style="display:none;" class="system-alert" style="margin:0 1.5rem 1.5rem;">
+            <div>
+                <strong>System alert</strong>
+                <p id="urgentNotificationText"></p>
             </div>
-
-            <!-- Dual Column Layout for Face Auth & Notifications -->
-            <div class="dashboard-grid">
-                <!-- Face Registration Card -->
-                <div class="card" id="faceRegCard"
-                    style="display:none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                    <h3 style="color: white; margin-bottom:20px; font-size: 20px; font-weight: 700;">🔐 Face
-                        Authentication</h3>
-                    <div id="faceStatus">
-                        <!-- Status will be filled by JavaScript -->
-                    </div>
-                    <div id="faceRegForm" style="margin-top:20px;">
-                        <p style="margin-bottom:15px; opacity:0.95; line-height: 1.6;">Upload a clear, upright photo of
-                            your face for biometric verification at the gate. Use good lighting, make sure only one
-                            face is visible, and allow a little extra time on the first cloud registration attempt.</p>
-                        <input type="file" id="faceImage" accept="image/*" style="display:none;"
-                            onchange="handleFaceImage(this)">
-                        <label for="faceImage" class="btn"
-                            style="background:white; color:#667eea; cursor:pointer; display:inline-block; font-weight: 700;">
-                            📷 Choose Photo
-                        </label>
-                        <div id="imagePreview" style="margin-top:15px; display:none;">
-                            <img id="previewImg"
-                                style="max-width:100%; border-radius:12px; border:3px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                            <button id="registerFaceBtn" onclick="uploadFace()" class="btn"
-                                style="background:white; color:#667eea; margin-top:10px; width:100%; font-weight: 700;">
-                                ✅ Register Face
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notification Settings Card -->
-                <div class="card" id="notificationCard"
-                    style="display:none; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white;">
-                    <h3 style="color: white; margin-bottom:12px; font-size: 20px; font-weight: 700;">🔔 Browser Alerts
-                        & Parent Access</h3>
-                    <p style="margin: 0 0 16px 0; opacity: 0.95; line-height: 1.6;">Enable browser alerts on this
-                        device, save parent contact details, and share a secure parent portal link.</p>
-                    <div id="notificationStatus">
-                        <!-- Status will be filled by JavaScript -->
-                    </div>
-                    <div id="notificationActions" style="margin-top:20px;">
-                        <button onclick="enableStudentNotifications()" id="enableNotifBtn" class="btn"
-                            style="background:white; color:#28a745; font-weight:700; width:100%; margin-bottom:15px;">
-                            🔔 Enable Browser Alerts
-                        </button>
-                        <div id="contactForm" style="display:none;">
-                            <div style="margin-bottom:15px;">
-                                <label style="display:block; margin-bottom:8px; font-weight:600;">Your Phone Number
-                                    (Optional)</label>
-                                <input type="tel" id="studentPhone" placeholder="+919876543210"
-                                    style="width:100%; padding:12px; border:none; border-radius:8px; font-size:16px;">
-                            </div>
-                            <div style="margin-bottom:15px;">
-                                <label style="display:block; margin-bottom:8px; font-weight:600;">Parent/Guardian
-                                    Name</label>
-                                <input type="text" id="parentName" placeholder="Parent Name"
-                                    style="width:100%; padding:12px; border:none; border-radius:8px; font-size:16px;">
-                            </div>
-                            <div style="margin-bottom:15px;">
-                                <label style="display:block; margin-bottom:8px; font-weight:600;">Parent Phone
-                                    Number</label>
-                                <input type="tel" id="parentPhone" placeholder="+919876543210"
-                                    style="width:100%; padding:12px; border:none; border-radius:8px; font-size:16px;">
-                            </div>
-                            <button onclick="saveContactInfo()" class="btn"
-                                style="background:white; color:#28a745; font-weight:700; width:100%;">
-                                💾 Save Contact Info
-                            </button>
-                        </div>
-                        <div id="parentPortalLink"
-                            style="margin-top:20px; padding:15px; background:rgba(255,255,255,0.15); border-radius:12px; backdrop-filter:blur(10px); display:none;">
-                            <p style="font-size:14px; margin-bottom:10px; opacity:0.95;">📱 Share this secure link with
-                                your parent:</p>
-                            <div style="display:flex; gap:10px; align-items:center;">
-                                <input type="text" id="parentLinkInput" readonly
-                                    style="flex:1; padding:8px; border:none; border-radius:6px; font-size:12px; background:white; color:#333;">
-                                <button onclick="copyParentLink()" class="btn"
-                                    style="background:white; color:#28a745; padding:8px 15px; font-size:12px;">
-                                    📋 Copy
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Emergency Exit Button (Prominent) - Full Width -->
-            <div class="card full-width-card"
-                style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border: none; box-shadow: 0 12px 35px rgba(220,53,69,0.4); position: relative; overflow: hidden;">
-                <div
-                    style="position: absolute; top: 0; right: 0; width: 200px; height: 200px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;">
-                </div>
-                <h2
-                    style="color: white; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 28px; font-weight: 900; position: relative;">
-                    🚨 Emergency Exit
-                </h2>
-                <p style="opacity: 0.95; margin-bottom: 25px; font-size: 16px; line-height: 1.7; position: relative;">
-                    Need to leave campus urgently? Request an immediate emergency exit. This will notify all admins and
-                    grant you instant passage without approval delays.
-                </p>
-                <button onclick="requestEmergencyExit(this)" class="btn"
-                    style="background: white; color: #dc3545; font-weight: 800; width: 100%; padding: 18px; font-size: 17px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); position: relative; border-radius: 14px;">
-                    🚨 Request Emergency Exit Now
-                </button>
-                <div
-                    style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.15); border-radius: 14px; backdrop-filter: blur(10px); position: relative; border: 1px solid rgba(255,255,255,0.2);">
-                    <p style="font-size: 14px; margin: 0; opacity: 0.95; font-weight: 600;">⚠️ Use only for genuine
-                        emergencies</p>
-                    <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Instant approval - no waiting
-                        required</p>
-                    <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ All admins notified immediately</p>
-                    <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Complete audit trail maintained</p>
-                </div>
-            </div>
-
-            <!-- Quick Daily Entry Section with Side-by-Side Layout -->
-            <div class="daily-entry-section">
-                <!-- Left: Daily Entry Button -->
-                <div class="card daily-entry-card" style="box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);">
-                    <h2 style="color: white; font-size: 24px; font-weight: 800; margin-bottom: 15px;">🚪 Instant Gate
-                        Pass</h2>
-                    <p style="opacity: 0.95; margin-bottom: 25px; font-size: 15px; line-height: 1.7;">Generate your QR
-                        code instantly. No admin approval needed!</p>
-
-                    <!-- Pass Type Selector -->
-                    <div style="display: flex; gap: 12px; margin-bottom: 25px;">
-                        <button id="entryBtn" onclick="selectPassType('entry')" class="pass-type-btn"
-                            style="flex: 1; padding: 16px; border: 2px solid white; background: white; color: #667eea; border-radius: 12px; font-weight: 800; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 15px rgba(255,255,255,0.3);">
-                            🚪 Entry
-                        </button>
-                        <button id="exitBtn" onclick="selectPassType('exit')" class="pass-type-btn"
-                            style="flex: 1; padding: 16px; border: 2px solid rgba(255,255,255,0.5); background: transparent; color: white; border-radius: 12px; font-weight: 800; cursor: pointer; transition: all 0.3s;">
-                            🚶 Exit
-                        </button>
-                    </div>
-
-                    <button onclick="requestDailyEntry()" class="btn"
-                        style="background: white; color: #667eea; font-weight: 800; width: 100%; padding: 16px; font-size: 16px; box-shadow: 0 6px 20px rgba(255,255,255,0.4);">
-                        ⚡ Generate QR Now
-                    </button>
-                    <div
-                        style="margin-top: 25px; padding: 18px; background: rgba(255,255,255,0.15); border-radius: 12px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
-                        <p style="font-size: 14px; margin: 0; opacity: 0.95; font-weight: 600;">✓ Valid for 15 minutes
-                        </p>
-                        <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Select Entry or Exit type</p>
-                        <p style="font-size: 14px; margin: 8px 0 0 0; opacity: 0.95;">✓ Instant QR generation</p>
-                    </div>
-                </div>
-
-                <!-- Right: Current Pass QR Display -->
-                <div class="card qr-display-card" id="currentPassCard"
-                    style="display:none; box-shadow: 0 12px 40px rgba(102, 126, 234, 0.25);">
-                    <div style="text-align: center;">
-                        <h3 style="color: #667eea; margin-bottom: 20px; font-size: 24px; font-weight: 800;">✅ Your
-                            Active Pass</h3>
-                        <div class="pass-info-compact">
-                            <p style="margin: 8px 0; font-size: 15px; font-weight: 600;"><strong>Reason:</strong> <span
-                                    id="passReason"></span></p>
-                            <p style="margin: 8px 0; font-size: 15px; font-weight: 600;"><strong>Expires:</strong> <span
-                                    id="passExpiry"></span></p>
-                        </div>
-                        <div class="qr-container-inline">
-                            <div id="qrCode"></div>
-                            <p style="margin-top: 15px; font-size: 14px; color: #666; font-weight: 700;">📱 Show this to
-                                the guard</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Request Pass & Pending Pass in Dual Column -->
-            <div class="dashboard-grid">
-                <!-- Request Pass Section -->
-                <div class="card">
-                    <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 25px;">📝 Request Gate Pass</h2>
-                    <form id="passForm">
-                        <div class="form-group">
-                            <label for="passTypeRegular" style="font-size: 15px; font-weight: 700;">Pass Type</label>
-                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                                <button type="button" id="regularEntryBtn" onclick="selectRegularPassType('entry')"
-                                    class="pass-type-btn"
-                                    style="flex: 1; padding: 14px; border: 2px solid #667eea; background: #667eea; color: white; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s;">
-                                    🚪 Entry
-                                </button>
-                                <button type="button" id="regularExitBtn" onclick="selectRegularPassType('exit')"
-                                    class="pass-type-btn"
-                                    style="flex: 1; padding: 14px; border: 2px solid #ddd; background: white; color: #666; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s;">
-                                    🚶 Exit
-                                </button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="reason" style="font-size: 15px; font-weight: 700;">Reason</label>
-                            <textarea id="reason" rows="4"
-                                placeholder="E.g., Going home, Medical appointment, Family emergency, etc."
-                                required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="font-size: 16px;">📤 Submit
-                            Request</button>
-                    </form>
-                </div>
-
-                <!-- Pending Pass Section -->
-                <div class="card" id="pendingPassCard" style="display:none;">
-                    <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 25px;">⏳ Pending Approval</h2>
-                    <div class="pass-info">
-                        <p style="font-size: 16px;"><strong>Reason:</strong> <span id="pendingReason"></span></p>
-                        <p style="font-size: 16px;"><strong>Requested:</strong> <span id="pendingTime"></span></p>
-                        <p class="status-badge status-pending" style="margin-top: 20px; font-size: 15px;">Status:
-                            Pending</p>
-                    </div>
-                    <p style="text-align:center; color:#666; margin-top:30px; font-size: 15px; line-height: 1.6;">⏱️
-                        Waiting for admin approval...</p>
-                </div>
-            </div>
-
-            <!-- Pass History - Full Width -->
-            <div class="card full-width-card">
-                <h2
-                    style="font-size: 24px; font-weight: 800; margin-bottom: 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                    📜 My Pass History</h2>
-                <button onclick="loadPasses()" class="btn btn-secondary"
-                    style="margin-bottom:20px; font-weight: 700;">🔄 Refresh History</button>
-                <div id="passHistory"></div>
-            </div>
+            <button id="btnAcknowledgeAlert" class="btn btn-danger btn-sm">Acknowledge</button>
         </div>
-    </div>
 
-    <script src="app.js?v=20260306n"></script>
+        <div class="dash-wrap">
+
+            <!-- ── Alert in wrap (keeps layout correct) ── -->
+            <div id="urgentNotificationWrap" style="display:none;"></div>
+
+            <div class="screen-heading">
+                <div>
+                    <h2>Gate access</h2>
+                    <p>Current QR status, pass requests, reservations, biometrics, and guardian contact.</p>
+                </div>
+            </div>
+
+            <div class="dash-grid">
+
+                <!-- ╔══════════════════╗ -->
+                <!-- ║  LEFT: Gate pass ║ -->
+                <!-- ╚══════════════════╝ -->
+                <div class="col-pass workflow-panel">
+
+                    <!-- No pass -->
+                    <div id="noPassCard" class="pass-state">
+                        <div class="pass-state-icon">🔒</div>
+                        <h4>No active QR</h4>
+                        <p>Request clearance when you are ready.</p>
+                    </div>
+
+                    <!-- Active QR pass -->
+                    <div id="currentPassCard" class="active-pass" style="display:none;">
+                        <div class="active-pass-header">
+                            <h4>Active clearance</h4>
+                            <span class="badge badge-success">Live</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Reason</span>
+                            <span class="info-val" id="passReason">—</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Expires</span>
+                            <span class="info-val" id="passExpiry" style="color:var(--warning);">—</span>
+                        </div>
+                        <div class="qr-display"><div id="qrCode"></div></div>
+                    </div>
+
+                    <!-- Pending pass -->
+                    <div id="pendingPassCard" class="pending-pass" style="display:none;">
+                        <h4>Pending approval</h4>
+                        <div class="info-row">
+                            <span class="info-key">Reason</span>
+                            <span class="info-val" id="pendingReason">—</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Requested</span>
+                            <span class="info-val" id="pendingTime" style="color:var(--text-2);">—</span>
+                        </div>
+                        <p style="font-size:.78rem;margin-top:.75rem;color:var(--text-3);">Awaiting admin approval.</p>
+                    </div>
+
+                    <!-- Request section -->
+                    <section class="section">
+                        <div class="section-title">
+                            Access request
+                            <span>Entry / exit</span>
+                        </div>
+                        <div class="field" style="margin-bottom:.625rem;">
+                            <label for="reason">Reason for pass</label>
+                            <input type="text" id="reason" placeholder="e.g. Medical, Library, Shopping">
+                        </div>
+                        <div class="pass-btn-row">
+                            <button type="button" id="entryBtn" class="btn btn-primary" style="font-size:.82rem;">↑ Daily entry</button>
+                            <button type="button" id="exitBtn"  class="btn btn-secondary" style="font-size:.82rem;">↓ Daily exit</button>
+                        </div>
+                        <form id="passForm" style="display:none;"></form>
+                        <div class="hostel-row">
+                            <div class="hostel-label">Admin-approved request</div>
+                            <div class="pass-btn-row">
+                                <button type="button" id="regularEntryBtn" class="btn btn-secondary" style="font-size:.78rem;">↑ Regular entry</button>
+                                <button type="button" id="regularExitBtn"  class="btn btn-secondary" style="font-size:.78rem;">↓ Regular exit</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- ╔══════════════════════╗ -->
+                <!-- ║  CENTER: Slot booking ║ -->
+                <!-- ╚══════════════════════╝ -->
+                <div class="col-slots workflow-panel" id="slotBookingCard">
+                    <section class="section" style="height:100%;">
+                        <div class="section-title">
+                            Scheduled access
+                            <span>Slots</span>
+                        </div>
+                        <div class="slots-grid">
+                            <div>
+                                <div class="slot-col-label">Available windows</div>
+                                <div id="availableSlotsContainer" class="slot-list">
+                                    <p class="slot-empty">No active windows.</p>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="slot-col-label">Reserved windows</div>
+                                <div id="myBookingsContainer" class="slot-list">
+                                    <p class="slot-empty">No reservations yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- ╔═══════════════════════════════╗ -->
+                <!-- ║  RIGHT: Biometrics + Contact  ║ -->
+                <!-- ╚═══════════════════════════════╝ -->
+                <div class="col-right">
+
+                    <!-- Biometrics -->
+                    <div id="faceRegCard" class="workflow-panel">
+                        <section class="section">
+                            <div class="section-title">Biometrics</div>
+                            <div id="faceStatus" style="margin-bottom:.75rem;"></div>
+                            <div id="enrolledFacePreview" style="display:none;"></div>
+                            <form id="faceRegForm">
+                                <div class="field" style="margin-bottom:.5rem;">
+                                    <label for="faceImage">Photo sample</label>
+                                    <input type="file" id="faceImage" accept="image/*" style="padding:.4rem;font-size:.82rem;">
+                                </div>
+                                <div id="imagePreview" style="display:none;" class="mb-2">
+                                    <img id="previewImg" src="" alt="Preview">
+                                </div>
+                                <button type="submit" class="btn btn-secondary btn-full" id="registerFaceBtn" style="font-size:.8rem;padding:.5rem;">Enroll biometrics</button>
+                            </form>
+                        </section>
+                    </div>
+
+                    <!-- Emergency contact -->
+                    <div id="notificationCard" class="workflow-panel">
+                        <section class="section">
+                            <div class="section-title">Guardian contact</div>
+                            <div id="notificationStatus" style="margin-bottom:.75rem;font-size:.82rem;">Checking…</div>
+                            <div id="notificationActions">
+                                <button type="button" id="enableNotifBtn" class="btn btn-secondary btn-full" style="font-size:.8rem;padding:.5rem;margin-bottom:.75rem;">Enable browser alerts</button>
+                                <form id="contactForm">
+                                    <div class="field" style="margin-bottom:.5rem;">
+                                        <label for="studentPhone">Your phone</label>
+                                        <input type="text" id="studentPhone" placeholder="+X XXX XXX XXXX">
+                                    </div>
+                                    <div class="field" style="margin-bottom:.5rem;">
+                                        <label for="parentName">Guardian name</label>
+                                        <input type="text" id="parentName" placeholder="Primary guardian">
+                                    </div>
+                                    <div class="field" style="margin-bottom:.625rem;">
+                                        <label for="parentPhone">Guardian phone</label>
+                                        <input type="text" id="parentPhone" placeholder="+X XXX XXX XXXX">
+                                    </div>
+                                    <button type="submit" class="btn btn-secondary btn-full" style="font-size:.8rem;padding:.5rem;">Save contact info</button>
+                                </form>
+                            </div>
+
+                            <!-- Guardian share link -->
+                            <div id="parentPortalLink" style="display:none;" class="share-box mt-2">
+                                <label>Guardian share link</label>
+                                <p style="font-size:.75rem;color:var(--text-3);margin-bottom:.5rem;">Share this link with your guardian</p>
+                                <input type="text" id="parentLinkInput" readonly onclick="this.select()" style="font-size:.75rem;margin-bottom:.5rem;">
+                                <button onclick="copyParentLink()" class="btn btn-secondary btn-sm">Copy link</button>
+                            </div>
+                        </section>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ╔══════════════════════╗ -->
+            <!-- ║  FULL-WIDTH: History ║ -->
+            <!-- ╚══════════════════════╝ -->
+            <section class="section">
+                <div class="section-title">
+                    Access history
+                    <span>Recent gate activity</span>
+                </div>
+                <div class="history-wrap" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th>Used at</th>
+                            </tr>
+                        </thead>
+                        <tbody id="passHistory">
+                            <tr>
+                                <td colspan="5" style="text-align:center;color:var(--text-3);padding:2rem;">No pass requests yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </div><!-- /dash-wrap -->
+    </div><!-- /dashboardPage -->
+
+    <script>
+        function toggleRegister() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+            document.getElementById('authFormTitle').textContent = 'Request access';
+            document.getElementById('registerPrompt').style.display = 'none';
+        }
+        function toggleLogin() {
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('authFormTitle').textContent = 'Sign in';
+            document.getElementById('registerPrompt').style.display = 'block';
+        }
+        function copyParentLink() {
+            const el = document.getElementById('parentLinkInput');
+            el.select();
+            document.execCommand('copy');
+        }
+    </script>
+    <script src="../common/video-bg.js?v=20260519b"></script>
+    <script src="app.js?v=20260521a"></script>
 </body>
-
 </html>

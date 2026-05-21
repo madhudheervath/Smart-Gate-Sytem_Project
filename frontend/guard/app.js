@@ -291,21 +291,15 @@ async function verifyManual() {
 // Show result
 function showResult(type, title, message) {
     const resultDiv = document.getElementById('resultDisplay');
-    resultDiv.className = `result-display show result-${type}`;
-    resultDiv.innerHTML = `
-        <div class="result-icon">${type === 'success' ? '✅' : '❌'}</div>
-        <div style="font-size:32px; margin-bottom:10px;">${title}</div>
-        <div style="font-size:16px; font-weight:normal;">${message}</div>
-    `;
-
-    setTimeout(() => {
-        resultDiv.classList.remove('show');
-    }, 5000);
+    const time = new Date().toLocaleTimeString();
+    const color = type === 'success' ? 'var(--color-green)' : 'var(--color-red)';
+    resultDiv.innerHTML = `<div style="margin-bottom:0.3rem;"><span style="color:${color};font-weight:700;">[${time}] ${title}</span></div><div style="color:var(--color-text-muted);font-size:0.8rem;line-height:1.5;">${message}</div>`;
 }
 
-// Hide result
+// Hide result — resets terminal to ready state
 function hideResult() {
-    document.getElementById('resultDisplay').classList.remove('show');
+    const el = document.getElementById('resultDisplay');
+    if (el) el.innerHTML = '> SYSTEM READY. Awaiting input.';
 }
 
 // Play sound (simple beep using Web Audio API)
@@ -345,35 +339,28 @@ async function loadRecentScans() {
         const scans = await res.json();
 
         if (scans.length === 0) {
-            container.innerHTML = '<div class="empty-state">No scans yet</div>';
+            container.innerHTML = '<p style="color:var(--color-text-muted);font-size:0.85rem;text-align:center;padding:1.5rem 0;">No scans recorded yet.</p>';
             return;
         }
 
         container.innerHTML = scans.map(scan => {
-            const timeStr = new Date(scan.scan_time).toLocaleString();
-            const studentInfo = scan.student_name ?
-                `${scan.student_name} (${scan.student_code})` :
-                `Student #${scan.student_id}`;
-            const resultClass = scan.result === 'success' ? 'success' : 'error';
-            const resultIcon = scan.result === 'success' ? '✅' : '❌';
+            const timeStr = new Date(scan.scan_time).toLocaleTimeString();
+            const name = scan.student_name ? `${scan.student_name}${scan.student_code ? ' · ' + scan.student_code : ''}` : `ID #${scan.student_id}`;
+            const isSuccess = scan.result === 'success';
+            const isExpired = scan.result === 'expired';
+            const typeClass = isSuccess ? 'scan-type-entry' : isExpired ? 'scan-type-exit' : 'scan-type-denied';
+            const label = scan.result.toUpperCase();
+            const detail = scan.details ? `<span style="font-size:0.72rem;color:var(--color-text-muted);">${scan.details}</span>` : '';
 
-            return `
-                <div class="scan-item scan-${resultClass}">
-                    <div class="scan-header">
-                        <span class="scan-result">${resultIcon} ${scan.result.toUpperCase()}</span>
-                        <span class="scan-time">${timeStr}</span>
-                    </div>
-                    <div class="scan-details">
-                        <div><strong>Student:</strong> ${studentInfo}</div>
-                        <div><strong>Pass ID:</strong> #${scan.pass_id}</div>
-                        ${scan.details ? `<div><strong>Details:</strong> ${scan.details}</div>` : ''}
-                    </div>
-                </div>
-            `;
+            return `<div class="recent-scan-item">
+                <span class="time">${timeStr}</span>
+                <span class="scan-name">${name}${detail ? '<br>' + detail : ''}</span>
+                <span class="type ${typeClass}">${label}</span>
+            </div>`;
         }).join('');
 
     } catch (err) {
-        container.innerHTML = '<div class="empty-state">Failed to load scans</div>';
+        container.innerHTML = '<p style="color:var(--color-red);font-size:0.85rem;text-align:center;padding:1.5rem 0;">Failed to load audit logs.</p>';
         console.error('Error loading scans:', err);
     }
 }

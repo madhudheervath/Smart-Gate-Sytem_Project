@@ -13,6 +13,12 @@ services:
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      - key: APP_ENV
+        value: "production"
+      - key: ALLOWED_ORIGINS
+        value: "https://smart-gate-system.onrender.com"
+      - key: CAMPUS_TZ_OFFSET_HOURS
+        value: "0"
       - key: SELF_REGISTRATION_ENABLED
         value: "false"
       - key: ACCOUNT_REQUESTS_ENABLED

@@ -6,6 +6,9 @@ from settings import settings
 def make_qr_token(pass_id: int, user_id: int, ttl_minutes: int = None) -> tuple[str, int]:
     ttl = ttl_minutes or settings.QR_TTL_MINUTES
     exp = int(time.time()) + ttl*60
+    return make_qr_token_until(pass_id, user_id, exp)
+
+def make_qr_token_until(pass_id: int, user_id: int, exp: int) -> tuple[str, int]:
     data = f"{pass_id}.{user_id}.{exp}"
     sig = hmac.new(settings.SECRET_KEY.encode(), data.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{data}.{sig}", exp

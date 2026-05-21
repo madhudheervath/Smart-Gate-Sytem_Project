@@ -1,177 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Gate System</title>
-    <link rel="stylesheet" href="common/styles.css">
+    <title>SecureGate — Access Control System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg:      #07111f;
+            --surface: rgba(15,25,45,.88);
+            --surface-2: rgba(28,39,65,.92);
+            --border:  rgba(148,163,184,.18);
+            --accent:  #667eea;
+            --accent-h:#a78bfa;
+            --success: #34d399;
+            --text-1:  #e8eef8;
+            --text-2:  #8892a4;
+            --text-3:  #50596a;
+            --page-gutter: clamp(1rem, 2.5vw, 2rem);
+        }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        html { -webkit-font-smoothing:antialiased; }
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: 'Inter', system-ui, sans-serif;
+            background:
+                linear-gradient(135deg, rgba(102,126,234,.18), transparent 34%),
+                linear-gradient(315deg, rgba(52,211,153,.10), transparent 38%),
+                var(--bg);
+            color: var(--text-1);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
+        }
+        .live-bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            opacity: .44;
+        }
+        body > :not(.live-bg-canvas):not(script) {
+            position: relative;
+            z-index: 1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .live-bg-canvas { display: none; }
+            .portal { opacity: 1; transform: none; animation: none; }
+        }
+
+        /* ── Top bar ── */
+        header {
+            display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+            height: 56px;
+            padding: 0 2rem;
+            background: rgba(7,17,31,.82);
+            backdrop-filter: blur(18px);
         }
+        .brand { font-size: 1rem; font-weight: 700; letter-spacing: -.02em; }
+        .brand-sub { font-size: .75rem; color: var(--text-3); margin-left: .5rem; font-weight: 400; }
 
-        .container {
-            max-width: 1000px;
-            width: 90%;
-            margin: 40px auto;
-            text-align: center;
-        }
-
-        h1 {
-            color: #2d3748;
-            font-size: 3rem;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        p.subtitle {
-            color: #4a5568;
-            font-size: 1.2rem;
-            margin-bottom: 50px;
-        }
-
-        .portal-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 30px;
-            padding: 20px;
-        }
-
-        .portal-card {
-            background: white;
-            border-radius: 20px;
-            padding: 30px 20px;
-            text-decoration: none;
-            color: inherit;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        /* ── Hero ── */
+        .hero {
+            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            justify-content: center;
+            padding: clamp(3rem, 7vh, 5rem) var(--page-gutter) 3rem;
+            text-align: center;
+        }
+        .hero-title {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 800;
+            letter-spacing: -.03em;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff 24%, #a78bfa 58%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-desc {
+            font-size: 1rem;
+            color: var(--text-2);
+            max-width: 480px;
+            line-height: 1.7;
+            margin-bottom: 3rem;
         }
 
-        .portal-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.15);
-            border-color: #667eea;
+        /* ── Portal grid ── */
+        .portals {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(190px, 1fr));
+            gap: 1rem;
+            width: min(calc(100vw - var(--page-gutter) * 2), 1500px);
+            justify-content: center;
         }
+        @media (max-width: 960px) { .portals { grid-template-columns: repeat(2, minmax(190px, 1fr)); } }
+        @media (max-width: 500px)  { .portals { grid-template-columns: 1fr; width: 100%; max-width: 300px; } }
 
-        .icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            display: block;
+        .portal {
+            --portal-accent: #818cf8;
+            --portal-soft: rgba(129,140,248,.14);
+            --portal-border: rgba(129,140,248,.34);
+            background: var(--surface);
+            border: 1px solid var(--portal-border);
+            border-radius: 10px;
+            padding: 1.75rem 1.5rem;
+            text-decoration: none;
+            color: var(--text-1);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: .5rem;
+            transition: border-color .2s, transform .2s, background .2s;
+            opacity: 0;
+            transform: translateY(16px);
+            animation: rise .5s ease forwards;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 18px 46px rgba(0,0,0,.28);
+            backdrop-filter: blur(18px);
         }
-
-        .portal-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 10px;
+        .portal::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 3px;
+            background: var(--portal-accent);
         }
+        .portal:nth-child(1) { --portal-accent:#a78bfa; --portal-soft:rgba(102,126,234,.16); --portal-border:rgba(167,139,250,.34); animation-delay: .05s; }
+        .portal:nth-child(2) { --portal-accent:#22d3ee; --portal-soft:rgba(14,165,233,.16); --portal-border:rgba(34,211,238,.34); animation-delay: .12s; }
+        .portal:nth-child(3) { --portal-accent:#34d399; --portal-soft:rgba(16,185,129,.16); --portal-border:rgba(52,211,153,.34); animation-delay: .19s; }
+        .portal:nth-child(4) { --portal-accent:#f093fb; --portal-soft:rgba(245,87,108,.16); --portal-border:rgba(240,147,251,.34); animation-delay: .26s; }
+        @keyframes rise { to { opacity:1; transform:translateY(0); } }
 
-        .portal-desc {
-            color: #718096;
-            font-size: 0.95rem;
-            line-height: 1.5;
+        .portal:hover {
+            border-color: var(--portal-accent);
+            background: var(--surface-2);
+            transform: translateY(-3px);
+            box-shadow: 0 22px 54px rgba(0,0,0,.34), 0 0 0 4px var(--portal-soft);
         }
+        .portal:hover .portal-arrow { color: var(--portal-accent); }
 
-        /* Card specific colors on hover */
-        .portal-card.student:hover .icon {
-            transform: scale(1.1);
-            transition: transform 0.3s;
-        }
-
-        .portal-card.guard:hover .icon {
-            transform: scale(1.1);
-            transition: transform 0.3s;
-        }
-
-        .portal-card.admin:hover .icon {
-            transform: scale(1.1);
-            transition: transform 0.3s;
-        }
-
-        .portal-card.parent:hover .icon {
-            transform: scale(1.1);
-            transition: transform 0.3s;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            }
-
-            h1 {
-                color: #fff;
-            }
-
-            p.subtitle {
-                color: #a0aec0;
-            }
-
-            .portal-card {
-                background: rgba(30, 30, 50, 0.8);
-                backdrop-filter: blur(10px);
-                border-color: rgba(255, 255, 255, 0.1);
-            }
-
-            .portal-title {
-                color: #fff;
-            }
-
-            .portal-desc {
-                color: #cbd5e0;
-            }
+        .portal-icon { font-size: 1.5rem; margin-bottom: .25rem; }
+        .portal-name { font-size: .95rem; font-weight: 700; color: var(--portal-accent); }
+        .portal-desc { font-size: .78rem; color: var(--text-2); line-height: 1.55; flex: 1; }
+        .portal-arrow {
+            font-size: .78rem;
+            color: var(--text-3);
+            transition: color .2s;
+            margin-top: .375rem;
+            align-self: flex-end;
         }
     </style>
 </head>
-
 <body>
+    <canvas id="particleCanvas" class="live-bg-canvas" aria-hidden="true"></canvas>
 
-    <div class="container">
-        <h1>Smart Gate System</h1>
-        <p class="subtitle">Secure Campus Access Management</p>
+    <header>
+        <div>
+            <span class="brand">SecureGate</span>
+            <span class="brand-sub">AI-Powered Access Control</span>
+        </div>
+    </header>
 
-        <div class="portal-grid">
-            <!-- Student Portal -->
-            <a href="student/index.html" class="portal-card student">
-                <span class="icon">🎓</span>
-                <span class="portal-title">Authorized Personnel Portal</span>
-                <span class="portal-desc">Generate pass QR codes, view history, and manage your profile.</span>
+    <main class="hero">
+        <h1 class="hero-title">SecureGate</h1>
+        <p class="hero-desc">Multi-factor digital gate control — QR passes, biometric verification, GPS geofencing, and real-time audit logs.</p>
+
+        <div class="portals">
+            <a href="student/index.html" class="portal">
+                <div class="portal-icon">🎓</div>
+                <div class="portal-name">Personnel</div>
+                <div class="portal-desc">Manage gate passes, biometric enrollment, and slot bookings.</div>
+                <div class="portal-arrow">Open →</div>
             </a>
 
-            <!-- Guard Portal -->
-            <a href="guard/index.html" class="portal-card guard">
-                <span class="icon">👮</span>
-                <span class="portal-title">Security Checkpoint Portal</span>
-                <span class="portal-desc">Scan QR codes, verify identities, and monitor gate entries.</span>
+            <a href="guard/index.html" class="portal">
+                <div class="portal-icon">🛡️</div>
+                <div class="portal-name">Checkpoint</div>
+                <div class="portal-desc">Scan QR tokens and run biometric verification at the gate.</div>
+                <div class="portal-arrow">Open →</div>
             </a>
 
-            <!-- Parent Portal -->
-            <a href="parent/index.html" class="portal-card parent">
-                <span class="icon">👪</span>
-                <span class="portal-title">Parent Portal</span>
-                <span class="portal-desc">Receive notifications and track your student's campus activity.</span>
+            <a href="parent/index.html" class="portal">
+                <div class="portal-icon">📱</div>
+                <div class="portal-name">Guardian</div>
+                <div class="portal-desc">Track your student's access history and receive alerts.</div>
+                <div class="portal-arrow">Open →</div>
             </a>
 
-            <!-- Admin Portal -->
-            <a href="admin/index.html" class="portal-card admin">
-                <span class="icon">🛡️</span>
-                <span class="portal-title">Access Control Administrator Portal</span>
-                <span class="portal-desc">Manage users, approve passes, and view system analytics.</span>
+            <a href="admin/index.html" class="portal">
+                <div class="portal-icon">⚙️</div>
+                <div class="portal-name">Administration</div>
+                <div class="portal-desc">Approve passes, manage users, and monitor live activity.</div>
+                <div class="portal-arrow">Open →</div>
             </a>
         </div>
-    </div>
+    </main>
 
+    <script src="common/video-bg.js?v=20260519b"></script>
 </body>
-
 </html>

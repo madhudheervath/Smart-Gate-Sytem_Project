@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     FACE_AUTH_BACKEND: str = "opencv"
     NOTIFICATIONS_ENABLED: bool = False
     GEOFENCE_ENABLED: bool = True
+    ENABLE_DEBUG_ENDPOINTS: bool = False
+    APP_ENV: str = "development"
+    # Campus local timezone: UTC offset in decimal hours (e.g. 5.5 = UTC+5:30, -5 = UTC-5, 0 = UTC)
+    CAMPUS_TZ_OFFSET_HOURS: float = 0.0
 
     @field_validator("DB_URL")
     @classmethod

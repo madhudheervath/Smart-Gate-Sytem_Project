@@ -16,44 +16,44 @@ db = SessionLocal()
 # Student data with parent information
 students_data = [
     {
-        "name": "Madhavi",
-        "email": "u22cn361@cmrtc.ac.in",
-        "password": "madhavi123",
-        "student_id": "U22CN361",
-        "student_class": "CSE-B",
-        "parent_name": "Rajesh Kumar",
-        "parent_phone": "+919876543210",
-        "phone": "+919876543211"
+        "name": "Alice Chen",
+        "email": "alice@uni.edu",
+        "password": "alice123",
+        "student_id": "S1001",
+        "student_class": "CS-B",
+        "parent_name": "Mary Chen",
+        "parent_phone": "+12025550101",
+        "phone": "+12025550102"
     },
     {
-        "name": "Dhanush",
-        "email": "u22cn362@cmrtc.ac.in",
-        "password": "dhanush123",
-        "student_id": "U22CN362",
-        "student_class": "CSE-B",
-        "parent_name": "Suresh Reddy",
-        "parent_phone": "+919876543212",
-        "phone": "+919876543213"
+        "name": "Bob Müller",
+        "email": "bob@uni.edu",
+        "password": "bob123",
+        "student_id": "S1002",
+        "student_class": "CS-B",
+        "parent_name": "James Müller",
+        "parent_phone": "+12025550103",
+        "phone": "+12025550104"
     },
     {
-        "name": "Gowrishankar",
-        "email": "u22cn414@cmrtc.ac.in",
-        "password": "gowri123",
-        "student_id": "U22CN414",
-        "student_class": "CSE-A",
-        "parent_name": "Venkata Rao",
-        "parent_phone": "+919876543214",
-        "phone": "+919876543215"
+        "name": "Carol Osei",
+        "email": "carol@uni.edu",
+        "password": "carol123",
+        "student_id": "S1003",
+        "student_class": "CS-A",
+        "parent_name": "Sarah Osei",
+        "parent_phone": "+12025550105",
+        "phone": "+12025550106"
     },
     {
-        "name": "Tharun",
-        "email": "u22cn421@cmrtc.ac.in",
-        "password": "tharun123",
-        "student_id": "U22CN421",
-        "student_class": "CSE-A",
-        "parent_name": "Ramesh Naidu",
-        "parent_phone": "+919876543216",
-        "phone": "+919876543217"
+        "name": "David Pham",
+        "email": "david@uni.edu",
+        "password": "david123",
+        "student_id": "S1004",
+        "student_class": "CS-A",
+        "parent_name": "Robert Pham",
+        "parent_phone": "+12025550107",
+        "phone": "+12025550108"
     }
 ]
 
@@ -149,8 +149,8 @@ print("""
 2. SETUP PARENT NOTIFICATIONS:
    - Use the secure parent portal link from the student portal
    - Student ID and student name should already be pre-filled
-   - Enter parent name (e.g., Rajesh Kumar)
-   - Enter phone number (e.g., +919876543210)
+   - Enter parent name (e.g., Mary Chen)
+   - Enter phone number (e.g., +12025550101)
    - Click "Continue Setup"
 
 3. TEST NOTIFICATIONS:

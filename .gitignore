@@ -53,3 +53,8 @@ Thumbs.db
 backend/firebase-credentials.json
 firebase-credentials.json
 
+
+# Face enrollment thumbnails (user PII — never commit)
+backend/data/face_previews/*.jpg
+backend/data/face_previews/*.jpeg
+backend/data/face_previews/*.png

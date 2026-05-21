@@ -27,6 +27,9 @@ ADDITIVE_COLUMNS = {
         "request_longitude": "TEXT",
         "location_verified": "BOOLEAN DEFAULT FALSE",
         "location_distance_km": "TEXT",
+        "slot_id": "INTEGER",
+        "access_mode": "VARCHAR(20) DEFAULT 'standard'",
+        "requires_face_check": "BOOLEAN DEFAULT FALSE",
     },
     "scan_logs": {
         "pass_type": "VARCHAR(10) DEFAULT 'entry'",

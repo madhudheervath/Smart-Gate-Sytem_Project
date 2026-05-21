@@ -75,10 +75,15 @@ class PassRequest(Base):
     used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     # GPS Geofencing fields
-    request_latitude = Column(Text, nullable=True)  # GPS lat when requested
-    request_longitude = Column(Text, nullable=True)  # GPS lon when requested
-    location_verified = Column(Boolean, default=False)  # If location was inside campus
-    location_distance_km = Column(Text, nullable=True)  # Distance from campus center
+    request_latitude = Column(Text, nullable=True)
+    request_longitude = Column(Text, nullable=True)
+    location_verified = Column(Boolean, default=False)
+    location_distance_km = Column(Text, nullable=True)
+
+    # Slot scheduling fields (Phase 2 extension)
+    slot_id = Column(Integer, ForeignKey("slots.id"), nullable=True)
+    access_mode = Column(String(20), nullable=True, default="standard")  # standard|instant|slot-bound|visitor
+    requires_face_check = Column(Boolean, default=False)  # policy-driven face requirement
 
 class ScanLog(Base):
     __tablename__ = "scan_logs"
@@ -91,3 +96,34 @@ class ScanLog(Base):
     pass_type = Column(String(10), default="entry")  # entry|exit
     emergency = Column(Boolean, default=False)
     details = Column(Text, nullable=True)
+
+
+class Slot(Base):
+    """Time-window and capacity definition for controlled access scheduling."""
+    __tablename__ = "slots"
+    id = Column(Integer, primary_key=True, index=True)
+    label = Column(String(200), nullable=False)           # e.g. "Morning Entry 08:00–10:00"
+    gate = Column(String(100), nullable=False, default="Main Gate")
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    capacity = Column(Integer, nullable=False, default=50)
+    active = Column(Boolean, default=True)
+    gps_required = Column(Boolean, default=False)         # policy flag
+    face_check_required = Column(Boolean, default=False)  # policy flag
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=now_ist)
+
+    bookings = relationship("SlotBooking", back_populates="slot")
+
+
+class SlotBooking(Base):
+    """Member reservation of a time slot; linked to the eventual pass."""
+    __tablename__ = "slot_bookings"
+    id = Column(Integer, primary_key=True, index=True)
+    slot_id = Column(Integer, ForeignKey("slots.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    pass_id = Column(Integer, ForeignKey("passes.id"), nullable=True)
+    booking_status = Column(String(20), nullable=False, default="confirmed")  # confirmed|cancelled
+    booked_at = Column(DateTime, default=now_ist)
+
+    slot = relationship("Slot", back_populates="bookings")

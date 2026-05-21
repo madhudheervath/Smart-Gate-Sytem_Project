@@ -1,293 +1,306 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Parent Notifications - Campus GatePass</title>
-    <link rel="stylesheet" href="./style.css">
+    <title>SecureGate | Guardian Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../common/styles.css?v=20260519c">
     <style>
-        /* Fallback styles in case CSS doesn't load */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            margin: 0;
+        .parent-wrap {
+            min-height: calc(100dvh - 56px);
+            display: flex; align-items: center; justify-content: center;
+            padding: 2rem 1rem;
+        }
+        .step-card {
+            width: 100%; max-width: 520px;
+        }
+        .step { display: none; }
+        .step.active { display: block; }
+
+        /* Step progress indicator */
+        .progress-indicator {
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 2rem; gap: 0;
+        }
+        .prog-dot {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(0,0,0,0.4); border: 2px solid var(--glass-border);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+            color: var(--color-text-muted); transition: all 0.3s; flex-shrink: 0;
+        }
+        .prog-dot.active {
+            background: var(--color-cyan); border-color: var(--color-cyan);
+            color: #000; font-weight: 700;
+            box-shadow: 0 0 12px rgba(0,212,255,0.5);
+        }
+        .prog-dot.done {
+            background: rgba(52,199,89,0.15);
+            border-color: var(--color-green); color: var(--color-green);
+        }
+        .prog-line {
+            flex: 1; max-width: 50px; height: 1px;
+            background: var(--glass-border);
         }
 
-        .container {
-            max-width: 600px;
+        /* Progress log box */
+        .progress-log {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius-sm);
+            padding: 1.2rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem; line-height: 2;
+            margin: 1.2rem 0;
+        }
+        .log-item { display: flex; align-items: center; gap: 0.5rem; }
+        .log-item.pending { color: var(--color-text-muted); }
+        .log-item.done { color: var(--color-green); }
+        .log-item.fail { color: var(--color-red); }
+
+        /* Success dashboard — full width */
+        .success-wrap {
+            width: min(calc(100% - var(--page-gutter) * 2), var(--page-max));
             margin: 0 auto;
+            padding: clamp(1rem, 2vw, 1.5rem) 0 3rem;
+        }
+        .student-identity-card {
+            background: rgba(0,212,255,0.06);
+            border: 1px solid rgba(0,212,255,0.25);
+            border-left: 4px solid var(--color-cyan);
+            border-radius: var(--border-radius-md);
+            padding: 1.2rem 1.8rem;
+            margin-bottom: 1.2rem;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 1rem;
+        }
+        .student-identity-card h2 { color: var(--color-cyan); font-size: 1.4rem; margin-bottom: 0.2rem; }
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            background: rgba(52,199,89,0.15);
+            border: 1px solid var(--color-green);
+            color: var(--color-green);
+            padding: 0.35rem 0.9rem;
+            border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 30px;
-        }
-
-        .step {
-            display: none;
-        }
-
-        .step.active {
-            display: block;
-        }
-
-        .card {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #555;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #f8f9fa;
-            color: #6c757d;
-            border: 2px solid #e9ecef;
-        }
-
+        /* History list */
+        .history-list { list-style: none; padding: 0; }
         .history-item {
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-            background: #f8f9fa;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.65rem 0.75rem; margin-bottom: 0.35rem;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius-sm);
+            font-size: 0.83rem; gap: 0.5rem;
+        }
+        .history-item-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.15rem; }
+        .history-item-details { font-size: 0.75rem; color: var(--color-text-muted); font-family: 'JetBrains Mono', monospace; }
+        .history-item-time { color: var(--color-cyan); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; flex-shrink: 0; }
+        .history-item-type { font-size: 0.82rem; font-weight: 600; }
+        .history-item.entry { border-left: 3px solid var(--color-green); }
+        .history-item.exit  { border-left: 3px solid var(--color-red); }
+
+        @media (max-width: 680px) {
+            .success-wrap { width: min(calc(100% - 1rem), var(--page-max)); }
+            .history-item { align-items: flex-start; flex-direction: column; }
         }
 
-        .history-item.entry {
-            border-left-color: #28a745;
-            background: #f0f8f4;
+        /* Error card */
+        .error-card {
+            border-color: rgba(255,59,48,0.4) !important;
+            border-left: 4px solid var(--color-red) !important;
         }
 
-        .history-item.exit {
-            border-left-color: #dc3545;
-            background: #fef5f5;
+        .status-box {
+            background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border);
+            padding: 0.7rem 0.9rem; border-radius: var(--border-radius-sm);
         }
-
-        .history-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 5px;
+        .loader {
+            width: 36px; height: 36px;
+            border: 3px solid rgba(0,212,255,0.15);
+            border-top-color: var(--color-cyan);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            margin: 1.5rem auto;
         }
-
-        .history-item-type {
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .history-item-time {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .history-item-details {
-            font-size: 13px;
-            color: #555;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
+<body class="theme-parent">
+    <canvas id="particleCanvas" class="live-bg-canvas" aria-hidden="true"></canvas>
+    <nav class="navbar">
+        <a href="../index.html" class="nav-brand">
+            <span style="color:#fff;">SecureGate</span>
+            <span style="color:var(--color-text-muted);font-size:0.85rem;font-weight:400;">Guardian Portal</span>
+        </a>
+        <div class="nav-links"><a href="../index.html">← Main Hub</a></div>
+    </nav>
 
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🏫 Campus GatePass</h1>
-            <h2>Parent Notification Setup</h2>
-            <p>Use the secure student link to review campus activity and optionally enable browser alerts on this device</p>
-        </div>
+    <!-- STEP FLOW (centered, single card) -->
+    <div id="stepFlow">
 
-        <!-- Step 1: Student ID Input -->
+        <!-- STEP 1: Loading / Link Validation -->
         <div id="step1" class="step active">
-            <div class="card">
-                <h3>📝 Step 1: Enter Student Information</h3>
-                <p style="margin-top: 0; color: #666;">Open this page from the secure link shared in the student portal. The student details should already be pre-filled.</p>
-                <div class="form-group">
-                    <label for="studentId">Student ID (e.g., U22CN362)</label>
-                    <input type="text" id="studentId" placeholder="Enter student ID" required>
+            <div class="parent-wrap">
+                <div class="step-card">
+                    <div class="glass-card" style="text-align:center;">
+                        <div class="progress-indicator">
+                            <div class="prog-dot active">1</div>
+                            <div class="prog-line"></div>
+                            <div class="prog-dot">2</div>
+                            <div class="prog-line"></div>
+                            <div class="prog-dot">3</div>
+                        </div>
+                        <h2 style="margin-bottom:0.5rem;">Validating Secure Link</h2>
+                        <p>Establishing encrypted handshake with SecureGate…</p>
+                        <div class="loader"></div>
+                        <!-- Legacy hidden fields required by app.js -->
+                        <input type="hidden" id="studentId">
+                        <input type="hidden" id="studentName">
+                        <input type="hidden" id="parentName">
+                        <input type="hidden" id="parentPhone">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="studentName">Student Name</label>
-                    <input type="text" id="studentName" placeholder="Enter student name" required>
-                </div>
-                <div class="form-group">
-                    <label for="parentName">Your Name (Parent/Guardian)</label>
-                    <input type="text" id="parentName" placeholder="Enter your name" required>
-                </div>
-                <div class="form-group">
-                    <label for="parentPhone">Your Phone Number (Optional)</label>
-                    <input type="tel" id="parentPhone" placeholder="+919876543210">
-                    <small>For SMS backup (if available)</small>
-                </div>
-                <button class="btn btn-primary" onclick="validateStudent()">
-                    Next: Verify Student
-                </button>
             </div>
         </div>
 
-        <!-- Step 2: Student Verification -->
+        <!-- STEP 2: Confirm Identity -->
         <div id="step2" class="step">
-            <div class="card">
-                <h3>✅ Step 2: Student Verified</h3>
-                <div id="studentInfo" class="student-info">
-                    <!-- Student info will be populated here -->
+            <div class="parent-wrap">
+                <div class="step-card">
+                    <div class="glass-card">
+                        <div class="progress-indicator">
+                            <div class="prog-dot done">✓</div>
+                            <div class="prog-line"></div>
+                            <div class="prog-dot active">2</div>
+                            <div class="prog-line"></div>
+                            <div class="prog-dot">3</div>
+                        </div>
+                        <h2 style="margin-bottom:0.5rem;text-align:center;">Confirm Guardian Link</h2>
+                        <p style="text-align:center;margin-bottom:1.5rem;">You are establishing a secure observer link for:</p>
+                        <div class="status-box" style="text-align:center;margin-bottom:1.5rem;border-color:rgba(0,212,255,0.25);background:rgba(0,212,255,0.05);">
+                            <h3 id="studentInfo" style="color:var(--color-cyan);font-size:1.1rem;margin:0;">—</h3>
+                        </div>
+                        <p style="font-size:0.82rem;text-align:center;margin-bottom:1.2rem;color:var(--color-text-muted);">This will enable real-time gate notifications to your device.</p>
+                        <button onclick="enableNotifications()" class="btn btn-primary" style="width:100%;">Establish Guardian Link</button>
+                    </div>
                 </div>
-                <button class="btn btn-primary" onclick="enableNotifications()">
-                    Continue Setup
-                </button>
-                <button class="btn btn-secondary" onclick="goBack()">
-                    Back
-                </button>
             </div>
         </div>
 
-        <!-- Step 3: Notification Setup -->
+        <!-- STEP 3: Registration Progress -->
         <div id="step3" class="step">
-            <div class="card">
-                <h3>🔔 Step 3: Browser Alerts & Parent Access</h3>
-                <div class="notification-status">
-                    <div id="notificationProgress">
-                        <div class="progress-step">
-                            <span class="step-number">1</span>
-                            <span>Browser Permission</span>
-                            <span id="permissionStatus" class="status">⏳ Waiting...</span>
+            <div class="parent-wrap">
+                <div class="step-card">
+                    <div class="glass-card">
+                        <div class="progress-indicator">
+                            <div class="prog-dot done">✓</div>
+                            <div class="prog-line"></div>
+                            <div class="prog-dot done">✓</div>
+                            <div class="prog-line"></div>
+                            <div class="prog-dot active">3</div>
                         </div>
-                        <div class="progress-step">
-                            <span class="step-number">2</span>
-                            <span>Browser Alerts</span>
-                            <span id="registrationStatus" class="status">⏳ Waiting...</span>
+                        <h2 style="margin-bottom:0.5rem;text-align:center;">Linking Device</h2>
+                        <p style="text-align:center;margin-bottom:0.5rem;">Please wait while your device is registered…</p>
+                        <div class="progress-log" id="notificationProgress">
+                            <div class="log-item" id="permissionStatus">⏳ Requesting notification permissions…</div>
+                            <div class="log-item" id="registrationStatus">⏳ Registering device node…</div>
+                            <div class="log-item" id="linkStatus">⏳ Linking to student telemetry…</div>
                         </div>
-                        <div class="progress-step">
-                            <span class="step-number">3</span>
-                            <span>Parent Contact Link</span>
-                            <span id="linkStatus" class="status">⏳ Waiting...</span>
-                        </div>
+                        <div id="notificationResult"></div>
                     </div>
                 </div>
-                <div id="notificationResult" class="result hidden">
-                    <!-- Result will be shown here -->
-                </div>
-                <button class="btn btn-secondary" onclick="goBack()" id="backBtn">
-                    Back
-                </button>
             </div>
         </div>
 
-        <!-- Success Page -->
-        <div id="success" class="step">
-            <div class="card success-card">
-                <div class="success-icon">🎉</div>
-                <h3>All Set!</h3>
-                <p>This page is now linked to activity for <strong id="successStudentName"></strong>.</p>
-                <p id="successSetupNote" style="color: #666; margin-top: 10px;"></p>
+    </div><!-- /stepFlow -->
 
-                <!-- Last Status Display -->
-                <div class="last-status-section" style="margin-top: 20px;">
-                    <h4 style="text-align: center; margin-bottom: 15px;">📊 Current Status</h4>
-                    <div id="lastStatusContainer"
-                        style="padding: 15px; background: #f8f9fa; border-radius: 10px; text-align: center;">
-                        <div id="lastStatusLoading" style="color: #666;">
-                            Loading status...
-                        </div>
-                        <div id="lastStatusDisplay" style="display: none;">
-                            <!-- Last status will be displayed here -->
-                        </div>
-                        <div id="lastStatusEmpty" style="display: none; color: #666;">
-                            No entry/exit records yet
-                        </div>
-                    </div>
+    <!-- SUCCESS DASHBOARD (full-width) -->
+    <div id="success" class="step">
+        <div class="success-wrap">
+
+            <!-- Student Identity Card (full-width banner) -->
+            <div class="student-identity-card">
+                <div>
+                    <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:2px;color:var(--color-text-muted);font-family:'JetBrains Mono',monospace;margin-bottom:0.4rem;">Observer Target</div>
+                    <h2 id="studentInfo2" style="color:var(--color-cyan);">—</h2>
+                    <p id="successSetupNote" style="font-size:0.85rem;color:var(--color-text-muted);margin-top:0.2rem;">Guardian link active. Real-time notifications enabled.</p>
                 </div>
-
-                <!-- Student Entry/Exit History -->
-                <div id="studentHistory" style="margin-top: 30px; text-align: left; display: none;">
-                    <h4 style="text-align: center; margin-bottom: 15px;">📜 Activity History</h4>
-                    <div id="historyList" style="max-height: 300px; overflow-y: auto;">
-                        <!-- History items will be loaded here -->
+                <div style="text-align:right;">
+                    <div class="status-badge">
+                        <span style="width:7px;height:7px;background:var(--color-green);border-radius:50%;display:inline-block;box-shadow:0 0 5px var(--color-green);"></span>
+                        GUARDIAN LINK ACTIVE
                     </div>
-                    <div id="historyLoading" style="text-align: center; padding: 20px; color: #666;">
-                        Loading history...
-                    </div>
-                    <div id="historyEmpty" style="text-align: center; padding: 20px; color: #666; display: none;">
-                        No entry/exit records yet
-                    </div>
+                    <div style="font-size:0.75rem;color:var(--color-text-muted);margin-top:0.5rem;font-family:'JetBrains Mono',monospace;" id="notifBadge">📡 Push Notifications: OFF</div>
                 </div>
-
-                <button class="btn btn-primary" onclick="testNotification()">
-                    Send Browser Test Alert
-                </button>
-                <button class="btn btn-secondary" onclick="setupAnother()">
-                    Setup Another Child
-                </button>
             </div>
-        </div>
 
-        <!-- Error Page -->
-        <div id="error" class="step">
-            <div class="card error-card">
-                <div class="error-icon">❌</div>
-                <h3>Setup Failed</h3>
-                <p id="errorMessage">Something went wrong during setup.</p>
+            <!-- 2-col grid: Status + History -->
+            <div class="split-panel">
 
-                <div class="troubleshooting">
-                    <h4>🔧 Troubleshooting:</h4>
-                    <ul>
-                        <li>Make sure you're using a modern browser (Chrome, Firefox, Safari)</li>
-                        <li>Check that notifications are allowed in browser settings</li>
-                        <li>Ensure you have internet connection</li>
-                        <li>Try refreshing the page and starting over</li>
-                    </ul>
+                <!-- Current Status -->
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h3>Current Status</h3>
+                        <span style="font-size:0.75rem;color:var(--color-text-muted);font-family:'JetBrains Mono',monospace;">Live Telemetry</span>
+                    </div>
+                    <div id="lastStatusContainer">
+                        <div id="lastStatusLoading">
+                            <div class="loader" style="margin:1rem auto;width:28px;height:28px;border-width:2px;"></div>
+                            <p style="text-align:center;font-size:0.85rem;">Polling telemetry…</p>
+                        </div>
+                        <div id="lastStatusDisplay" style="display:none;"></div>
+                        <div id="lastStatusEmpty" style="display:none;text-align:center;padding:1.5rem 0;">
+                            <p style="color:var(--color-text-muted);font-size:0.88rem;">No recent gate activity.</p>
+                        </div>
+                    </div>
                 </div>
 
-                <button class="btn btn-primary" onclick="startOver()">
-                    Start Over
-                </button>
+                <!-- Audit Log -->
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h3>Audit Log</h3>
+                        <button onclick="loadStudentHistory()" class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.72rem;">Sync</button>
+                    </div>
+                    <div id="studentHistory">
+                        <div id="historyLoading">
+                            <div class="loader" style="margin:1rem auto;width:28px;height:28px;border-width:2px;"></div>
+                            <p style="text-align:center;font-size:0.85rem;">Synchronizing logs…</p>
+                        </div>
+                        <ul id="historyList" class="history-list" style="display:none;max-height:340px;overflow-y:auto;"></ul>
+                        <div id="historyEmpty" style="display:none;text-align:center;padding:1.5rem 0;">
+                            <p style="color:var(--color-text-muted);font-size:0.88rem;">No log entries found.</p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 
-    <script src="../common/config.js?v=20260306k"></script>
-    <script src="app.js?v=20260306k"></script>
-</body>
+    <!-- ERROR STATE -->
+    <div id="error" class="step">
+        <div class="parent-wrap">
+            <div class="step-card">
+                <div class="glass-card error-card" style="text-align:center;">
+                    <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+                    <h2 style="color:var(--color-red);margin-bottom:0.75rem;">Link Failed</h2>
+                    <div class="status-box" style="background:rgba(255,59,48,0.08);border-color:rgba(255,59,48,0.35);margin-bottom:1.5rem;">
+                        <p id="errorMessage" style="color:var(--color-text-main);font-size:0.88rem;"></p>
+                    </div>
+                    <button onclick="window.location.reload()" class="btn btn-secondary" style="border-color:var(--color-red);color:var(--color-red);">Retry Connection</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+    <script src="../common/config.js?v=20260306n"></script>
+    <script src="../common/video-bg.js?v=20260519b"></script>
+    <script src="app.js?v=20260306n"></script>
+</body>
 </html>
